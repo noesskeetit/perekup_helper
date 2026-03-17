@@ -1,6 +1,6 @@
 """Tests for card page parser."""
 
-from src.avito_parser.card_parser import parse_card_page
+from avito_parser.card_parser import parse_card_page
 
 
 class TestParseCardPage:

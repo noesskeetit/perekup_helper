@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Optional
 
 import anthropic
 
@@ -53,7 +52,7 @@ class BatchProcessor:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "claude-sonnet-4-20250514",
         batch_size: int = DEFAULT_BATCH_SIZE,
         max_tokens: int = 4096,
@@ -66,9 +65,7 @@ class BatchProcessor:
         self._max_tokens = max_tokens
         self._rate_limit_delay = rate_limit_delay
         self._max_retries = max_retries
-        self._single_categorizer = Categorizer(
-            api_key=api_key, model=model
-        )
+        self._single_categorizer = Categorizer(api_key=api_key, model=model)
 
     def process(self, listings: list[ListingDescription]) -> list[ScoreResult]:
         """Обработать список объявлений батчами.
@@ -105,18 +102,11 @@ class BatchProcessor:
 
         return results
 
-    def _process_batch(
-        self, batch: list[ListingDescription]
-    ) -> list[ScoreResult]:
+    def _process_batch(self, batch: list[ListingDescription]) -> list[ScoreResult]:
         """Обработать один батч объявлений одним API-вызовом."""
-        listings_block = "\n\n".join(
-            f"--- Объявление ID: {listing.id} ---\n{listing.text}"
-            for listing in batch
-        )
+        listings_block = "\n\n".join(f"--- Объявление ID: {listing.id} ---\n{listing.text}" for listing in batch)
 
-        prompt = BATCH_USER_PROMPT_TEMPLATE.format(
-            count=len(batch), listings_block=listings_block
-        )
+        prompt = BATCH_USER_PROMPT_TEMPLATE.format(count=len(batch), listings_block=listings_block)
 
         raw_text = self._call_api_with_retry(prompt)
         category_map = self._parse_batch_response(raw_text)
@@ -126,9 +116,7 @@ class BatchProcessor:
             if listing.id in category_map:
                 cat_result = category_map[listing.id]
             else:
-                logger.warning(
-                    "ID %s не найден в ответе батча, fallback", listing.id
-                )
+                logger.warning("ID %s не найден в ответе батча, fallback", listing.id)
                 cat_result = self._single_categorizer.categorize(listing)
 
             price_ratio = _compute_price_ratio(listing.price, listing.market_price)
@@ -146,7 +134,7 @@ class BatchProcessor:
 
     def _call_api_with_retry(self, user_prompt: str) -> str:
         """Вызов Claude API с retry при ошибках."""
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
                 message = self._client.messages.create(
@@ -175,9 +163,7 @@ class BatchProcessor:
                 if attempt < self._max_retries:
                     time.sleep(self._rate_limit_delay * attempt)
 
-        raise RuntimeError(
-            f"Не удалось вызвать Claude API за {self._max_retries} попыток"
-        ) from last_exc
+        raise RuntimeError(f"Не удалось вызвать Claude API за {self._max_retries} попыток") from last_exc
 
     def _process_single(self, listing: ListingDescription) -> ScoreResult:
         """Fallback: поштучная обработка через Categorizer."""
@@ -189,7 +175,7 @@ class BatchProcessor:
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
 
         try:

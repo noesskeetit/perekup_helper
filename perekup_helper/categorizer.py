@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
 
 import anthropic
 
 from perekup_helper.models import (
     CATEGORY_BASE_SCORES,
-    CATEGORY_LABELS,
     CarCategory,
     CategoryResult,
     ListingDescription,
@@ -72,7 +70,7 @@ class Categorizer:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "claude-sonnet-4-20250514",
         max_tokens: int = 512,
     ) -> None:
@@ -117,7 +115,7 @@ class Categorizer:
         # Убираем возможные markdown-обёртки
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
 
         try:
@@ -130,9 +128,7 @@ class Categorizer:
         try:
             category = CarCategory(data["category"])
         except (KeyError, ValueError) as exc:
-            raise ValueError(
-                f"Неизвестная категория: {data.get('category')}"
-            ) from exc
+            raise ValueError(f"Неизвестная категория: {data.get('category')}") from exc
 
         return CategoryResult(
             category=category,
@@ -142,18 +138,14 @@ class Categorizer:
         )
 
 
-def _compute_price_ratio(
-    price: Optional[int], market_price: Optional[int]
-) -> Optional[float]:
+def _compute_price_ratio(price: int | None, market_price: int | None) -> float | None:
     """Отношение цены к рынку. < 1.0 значит ниже рынка."""
     if price is None or market_price is None or market_price <= 0:
         return None
     return round(price / market_price, 3)
 
 
-def _compute_attractiveness(
-    result: CategoryResult, price_ratio: Optional[float]
-) -> float:
+def _compute_attractiveness(result: CategoryResult, price_ratio: float | None) -> float:
     """Скоринг привлекательности (0..10).
 
     Формула: base_category_score * 5 + price_discount_bonus * 5

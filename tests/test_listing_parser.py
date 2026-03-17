@@ -1,6 +1,6 @@
 """Tests for listing page parser."""
 
-from src.avito_parser.listing_parser import (
+from avito_parser.listing_parser import (
     SearchFilters,
     build_search_url,
     has_next_page,

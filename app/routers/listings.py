@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Listing
+from app.models.sync_listing import SyncListing as Listing
 from app.schemas import (
     ListingDetailResponse,
     PaginatedListings,
@@ -19,18 +18,16 @@ router = APIRouter(tags=["listings"])
 
 @router.get("/listings", response_model=PaginatedListings)
 def list_listings(
-    brand: Optional[str] = Query(None, description="Фильтр по марке"),
-    model: Optional[str] = Query(None, description="Фильтр по модели"),
-    year_from: Optional[int] = Query(None, description="Год от"),
-    year_to: Optional[int] = Query(None, description="Год до"),
-    price_from: Optional[float] = Query(None, description="Цена от"),
-    price_to: Optional[float] = Query(None, description="Цена до"),
-    mileage_from: Optional[int] = Query(None, description="Пробег от"),
-    mileage_to: Optional[int] = Query(None, description="Пробег до"),
-    market_diff_pct: Optional[float] = Query(
-        None, description="Макс. отклонение от рыночной цены (%)"
-    ),
-    category: Optional[str] = Query(None, description="Категория чистоты"),
+    brand: str | None = Query(None, description="Фильтр по марке"),
+    model: str | None = Query(None, description="Фильтр по модели"),
+    year_from: int | None = Query(None, description="Год от"),
+    year_to: int | None = Query(None, description="Год до"),
+    price_from: float | None = Query(None, description="Цена от"),
+    price_to: float | None = Query(None, description="Цена до"),
+    mileage_from: int | None = Query(None, description="Пробег от"),
+    mileage_to: int | None = Query(None, description="Пробег до"),
+    market_diff_pct: float | None = Query(None, description="Макс. отклонение от рыночной цены (%)"),
+    category: str | None = Query(None, description="Категория чистоты"),
     sort_by: SortBy = Query(SortBy.created_at, description="Сортировка"),
     page: int = Query(1, ge=1, description="Номер страницы"),
     per_page: int = Query(20, ge=1, le=100, description="Элементов на странице"),

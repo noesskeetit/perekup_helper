@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Listing
+from app.models.sync_listing import SyncListing as Listing
 from app.schemas import StatsResponse
 
 router = APIRouter(tags=["stats"])

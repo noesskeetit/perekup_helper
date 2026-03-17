@@ -168,11 +168,7 @@ def _map_param(param: dict, result: dict):
     if not field_name:
         return
 
-    if field_name in ("year", "engine_power_hp"):
-        digits = re.sub(r"[^\d]", "", str(value))
-        if digits:
-            result[field_name] = int(digits)
-    elif field_name == "mileage_km":
+    if field_name in ("year", "engine_power_hp") or field_name == "mileage_km":
         digits = re.sub(r"[^\d]", "", str(value))
         if digits:
             result[field_name] = int(digits)

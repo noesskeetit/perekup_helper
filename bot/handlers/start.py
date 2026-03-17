@@ -1,9 +1,8 @@
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
-from sqlalchemy import select
 
-from bot.db.models import Filter, User
+from bot.db.models import User
 from bot.db.session import async_session
 
 router = Router()
@@ -30,10 +29,7 @@ async def cmd_start(message: Message) -> None:
             if not user.is_active:
                 user.is_active = True
                 await session.commit()
-            await message.answer(
-                "С возвращением! Уведомления активны.\n"
-                "Используй /filters для настройки фильтров."
-            )
+            await message.answer("С возвращением! Уведомления активны.\nИспользуй /filters для настройки фильтров.")
 
 
 @router.message(Command("stop"))
@@ -45,6 +41,4 @@ async def cmd_stop(message: Message) -> None:
             return
         user.is_active = False
         await session.commit()
-    await message.answer(
-        "Уведомления приостановлены. Отправь /start, чтобы возобновить."
-    )
+    await message.answer("Уведомления приостановлены. Отправь /start, чтобы возобновить.")

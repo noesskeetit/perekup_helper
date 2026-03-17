@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from bot.db.models import Filter, NotificationLog, User
+from bot.db.models import Filter, NotificationLog
 from bot.services.checker import Listing
 from bot.services.notifier import _format_message, _matches, _notify_user
 
@@ -107,9 +107,13 @@ class TestNotifyUser:
     @pytest.mark.asyncio
     async def test_sends_photo_when_photo_url(self, db_session):
         listing = Listing(
-            brand="BMW", model="X5", year=2023,
-            price=3_000_000, market_price=3_500_000,
-            discount_pct=14.3, category="Кроссовер",
+            brand="BMW",
+            model="X5",
+            year=2023,
+            price=3_000_000,
+            market_price=3_500_000,
+            discount_pct=14.3,
+            category="Кроссовер",
             url="https://example.com/listing/456",
             photo_url="https://example.com/photo.jpg",
         )
@@ -126,9 +130,7 @@ class TestNotifyUser:
         with patch("bot.services.notifier.async_session", return_value=db_session):
             await _notify_user(bot, 333, sample_listing)
 
-        result = await db_session.execute(
-            select(NotificationLog).where(NotificationLog.telegram_id == 333)
-        )
+        result = await db_session.execute(select(NotificationLog).where(NotificationLog.telegram_id == 333))
         logs = result.scalars().all()
         assert len(logs) == 1
         assert logs[0].listing_url == sample_listing.url

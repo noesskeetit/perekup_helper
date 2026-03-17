@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -55,19 +54,15 @@ class ListingDescription(BaseModel):
 
     id: str = Field(description="Уникальный ID объявления")
     text: str = Field(description="Текст описания объявления")
-    price: Optional[int] = Field(default=None, description="Цена из объявления, руб.")
-    market_price: Optional[int] = Field(
-        default=None, description="Среднерыночная цена аналога, руб."
-    )
+    price: int | None = Field(default=None, description="Цена из объявления, руб.")
+    market_price: int | None = Field(default=None, description="Среднерыночная цена аналога, руб.")
 
 
 class CategoryResult(BaseModel):
     """Результат AI-категоризации одного объявления."""
 
     category: CarCategory = Field(description="Определённая категория")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Уверенность модели (0..1)"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Уверенность модели (0..1)")
     flags: list[str] = Field(
         default_factory=list,
         description="Ключевые флаги из описания",
@@ -80,10 +75,8 @@ class ScoreResult(BaseModel):
 
     listing_id: str
     category_result: CategoryResult
-    price_ratio: Optional[float] = Field(
+    price_ratio: float | None = Field(
         default=None,
         description="Отношение цены к рынку (< 1.0 = ниже рынка)",
     )
-    attractiveness_score: float = Field(
-        ge=0.0, le=10.0, description="Итоговый балл привлекательности (0..10)"
-    )
+    attractiveness_score: float = Field(ge=0.0, le=10.0, description="Итоговый балл привлекательности (0..10)")

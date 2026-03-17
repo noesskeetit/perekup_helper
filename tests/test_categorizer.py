@@ -76,9 +76,7 @@ class TestParseResponse:
         assert "после ДТП" in result.flags
 
     def test_owner_debtor(self) -> None:
-        raw = _make_claude_response(
-            "owner_debtor", 0.9, ["залог", "кредит"], "В залоге у банка"
-        )
+        raw = _make_claude_response("owner_debtor", 0.9, ["залог", "кредит"], "В залоге у банка")
         result = Categorizer._parse_response(raw)
         assert result.category == CarCategory.OWNER_DEBTOR
 
@@ -90,9 +88,7 @@ class TestCategorize:
         mock_anthropic_cls.return_value = mock_client
 
         mock_message = MagicMock()
-        mock_message.content = [
-            MagicMock(text=_make_claude_response("clean", 0.95, ["один хозяин"]))
-        ]
+        mock_message.content = [MagicMock(text=_make_claude_response("clean", 0.95, ["один хозяин"]))]
         mock_client.messages.create.return_value = mock_message
 
         cat = Categorizer(api_key="test-key")
@@ -109,13 +105,7 @@ class TestCategorize:
         mock_anthropic_cls.return_value = mock_client
 
         mock_message = MagicMock()
-        mock_message.content = [
-            MagicMock(
-                text=_make_claude_response(
-                    "complex_profitable", 0.8, ["срочно", "торг"]
-                )
-            )
-        ]
+        mock_message.content = [MagicMock(text=_make_claude_response("complex_profitable", 0.8, ["срочно", "торг"]))]
         mock_client.messages.create.return_value = mock_message
 
         cat = Categorizer(api_key="test-key")
@@ -213,6 +203,4 @@ class TestAttractiveness:
                         reasoning="",
                     )
                     score = _compute_attractiveness(result, ratio)
-                    assert 0.0 <= score <= 10.0, (
-                        f"Score {score} out of bounds for {cat}, conf={conf}, ratio={ratio}"
-                    )
+                    assert 0.0 <= score <= 10.0, f"Score {score} out of bounds for {cat}, conf={conf}, ratio={ratio}"

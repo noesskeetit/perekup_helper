@@ -14,21 +14,15 @@ async def cmd_stats(message: Message) -> None:
     uid = message.from_user.id
     async with async_session() as session:
         filters_count = (
-            await session.scalar(
-                select(func.count()).select_from(Filter).where(Filter.telegram_id == uid)
-            )
+            await session.scalar(select(func.count()).select_from(Filter).where(Filter.telegram_id == uid))
         ) or 0
 
         notifications_count = (
             await session.scalar(
-                select(func.count())
-                .select_from(NotificationLog)
-                .where(NotificationLog.telegram_id == uid)
+                select(func.count()).select_from(NotificationLog).where(NotificationLog.telegram_id == uid)
             )
         ) or 0
 
     await message.answer(
-        f"📊 Твоя статистика:\n\n"
-        f"Активных фильтров: {filters_count}\n"
-        f"Отправлено уведомлений: {notifications_count}"
+        f"📊 Твоя статистика:\n\nАктивных фильтров: {filters_count}\nОтправлено уведомлений: {notifications_count}"
     )

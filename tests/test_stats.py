@@ -1,5 +1,5 @@
-def test_stats_empty(client):
-    resp = client.get("/stats")
+def test_stats_empty(sync_client_empty):
+    resp = sync_client_empty.get("/stats")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_listings"] == 0
@@ -8,8 +8,8 @@ def test_stats_empty(client):
     assert data["by_brand"] == {}
 
 
-def test_stats_with_data(client, sample_listings):
-    resp = client.get("/stats")
+def test_stats_with_data(sync_client, sample_listings):
+    resp = sync_client.get("/stats")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_listings"] == 5
@@ -24,8 +24,8 @@ def test_stats_with_data(client, sample_listings):
     assert data["by_brand"]["Toyota"] == 2
 
 
-def test_stats_brand_counts(client, sample_listings):
-    resp = client.get("/stats")
+def test_stats_brand_counts(sync_client, sample_listings):
+    resp = sync_client.get("/stats")
     data = resp.json()
     total_by_brand = sum(data["by_brand"].values())
     assert total_by_brand == 5

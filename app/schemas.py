@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,13 +18,13 @@ class ListingBase(BaseModel):
     year: int
     price: float
     mileage: int
-    market_price: Optional[float] = None
-    price_diff: Optional[float] = None
-    market_diff_pct: Optional[float] = None
-    score: Optional[float] = None
-    category: Optional[str] = None
-    source_url: Optional[str] = None
-    image_url: Optional[str] = None
+    market_price: float | None = None
+    price_diff: float | None = None
+    market_diff_pct: float | None = None
+    score: float | None = None
+    category: str | None = None
+    source_url: str | None = None
+    image_url: str | None = None
 
 
 class ListingResponse(ListingBase):
@@ -37,11 +36,11 @@ class ListingResponse(ListingBase):
 
 
 class ListingDetailResponse(ListingResponse):
-    ai_analysis: Optional[str] = None
+    ai_analysis: str | None = None
 
 
 class PaginatedListings(BaseModel):
-    items: List[ListingResponse]
+    items: list[ListingResponse]
     total: int
     page: int
     per_page: int
@@ -49,16 +48,16 @@ class PaginatedListings(BaseModel):
 
 
 class ListingsFilter(BaseModel):
-    brand: Optional[str] = None
-    model_name: Optional[str] = Field(None, alias="model")
-    year_from: Optional[int] = None
-    year_to: Optional[int] = None
-    price_from: Optional[float] = None
-    price_to: Optional[float] = None
-    mileage_from: Optional[int] = None
-    mileage_to: Optional[int] = None
-    market_diff_pct: Optional[float] = None
-    category: Optional[str] = None
+    brand: str | None = None
+    model_name: str | None = Field(None, alias="model")
+    year_from: int | None = None
+    year_to: int | None = None
+    price_from: float | None = None
+    price_to: float | None = None
+    mileage_from: int | None = None
+    mileage_to: int | None = None
+    market_diff_pct: float | None = None
+    category: str | None = None
     sort_by: SortBy = SortBy.created_at
     page: int = Field(1, ge=1)
     per_page: int = Field(20, ge=1, le=100)
@@ -66,9 +65,9 @@ class ListingsFilter(BaseModel):
 
 class StatsResponse(BaseModel):
     total_listings: int
-    avg_price: Optional[float] = None
-    avg_mileage: Optional[float] = None
-    avg_market_diff_pct: Optional[float] = None
-    avg_score: Optional[float] = None
-    by_category: Dict[str, int] = {}
-    by_brand: Dict[str, int] = {}
+    avg_price: float | None = None
+    avg_mileage: float | None = None
+    avg_market_diff_pct: float | None = None
+    avg_score: float | None = None
+    by_category: dict[str, int] = {}
+    by_brand: dict[str, int] = {}

@@ -1,10 +1,10 @@
+import uuid as _uuid
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, func, desc, asc
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -38,15 +38,15 @@ SORT_COLUMNS = {
 async def listings_page(
     request: Request,
     session: AsyncSession = Depends(get_session),
-    brand: Optional[str] = Query(None),
-    model: Optional[str] = Query(None, alias="car_model"),
-    year_from: Optional[int] = Query(None),
-    year_to: Optional[int] = Query(None),
-    price_from: Optional[int] = Query(None),
-    price_to: Optional[int] = Query(None),
-    diff_from: Optional[float] = Query(None),
-    diff_to: Optional[float] = Query(None),
-    category: Optional[str] = Query(None),
+    brand: str | None = Query(None),
+    model: str | None = Query(None, alias="car_model"),
+    year_from: int | None = Query(None),
+    year_to: int | None = Query(None),
+    price_from: int | None = Query(None),
+    price_to: int | None = Query(None),
+    diff_from: float | None = Query(None),
+    diff_to: float | None = Query(None),
+    category: str | None = Query(None),
     sort_by: str = Query("created_at"),
     sort_dir: str = Query("desc"),
     page: int = Query(1, ge=1),
@@ -128,7 +128,11 @@ async def listing_detail(
     listing_id: str,
     session: AsyncSession = Depends(get_session),
 ):
-    stmt = select(Listing).options(selectinload(Listing.analysis)).where(Listing.id == listing_id)
+    try:
+        uid = _uuid.UUID(listing_id)
+    except ValueError:
+        return HTMLResponse("<h2>Объявление не найдено</h2>", status_code=404)
+    stmt = select(Listing).options(selectinload(Listing.analysis)).where(Listing.id == uid)
     result = await session.execute(stmt)
     listing = result.scalar_one_or_none()
 

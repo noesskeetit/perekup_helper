@@ -1,5 +1,4 @@
 from app.models.base import Base
-from app.models.listing import Listing
-from app.models.listing_analysis import ListingAnalysis, AnalysisCategory
+from app.models.listing import AnalysisCategory, Listing, ListingAnalysis
 
 __all__ = ["Base", "Listing", "ListingAnalysis", "AnalysisCategory"]

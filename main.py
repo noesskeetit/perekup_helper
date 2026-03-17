@@ -6,9 +6,9 @@ import logging
 import signal
 import sys
 
-from src.avito_parser.listing_parser import SearchFilters
-from src.avito_parser.pipeline import scrape_and_save
-from src.avito_parser.scheduler import start_scheduler, stop_scheduler
+from avito_parser.listing_parser import SearchFilters
+from avito_parser.pipeline import scrape_and_save
+from avito_parser.scheduler import start_scheduler, stop_scheduler
 
 
 def main():

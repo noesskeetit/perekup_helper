@@ -3,8 +3,6 @@
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from perekup_helper.batch import BatchProcessor
 from perekup_helper.models import CarCategory, ListingDescription
 
@@ -16,9 +14,7 @@ def _make_batch_response(items: list[dict[str, object]]) -> str:
 class TestBatchProcessor:
     @patch("perekup_helper.batch.anthropic.Anthropic")
     @patch("perekup_helper.categorizer.anthropic.Anthropic")
-    def test_single_batch(
-        self, mock_cat_cls: MagicMock, mock_batch_cls: MagicMock
-    ) -> None:
+    def test_single_batch(self, mock_cat_cls: MagicMock, mock_batch_cls: MagicMock) -> None:
         mock_client = MagicMock()
         mock_batch_cls.return_value = mock_client
 
@@ -60,9 +56,7 @@ class TestBatchProcessor:
 
     @patch("perekup_helper.batch.anthropic.Anthropic")
     @patch("perekup_helper.categorizer.anthropic.Anthropic")
-    def test_multiple_batches(
-        self, mock_cat_cls: MagicMock, mock_batch_cls: MagicMock
-    ) -> None:
+    def test_multiple_batches(self, mock_cat_cls: MagicMock, mock_batch_cls: MagicMock) -> None:
         mock_client = MagicMock()
         mock_batch_cls.return_value = mock_client
 
@@ -79,9 +73,7 @@ class TestBatchProcessor:
             MagicMock(content=[MagicMock(text=_make_batch_response(batch2))]),
         ]
 
-        processor = BatchProcessor(
-            api_key="test-key", batch_size=2, rate_limit_delay=0.0
-        )
+        processor = BatchProcessor(api_key="test-key", batch_size=2, rate_limit_delay=0.0)
         listings = [
             ListingDescription(id="1", text="A"),
             ListingDescription(id="2", text="B"),
@@ -95,9 +87,7 @@ class TestBatchProcessor:
         assert mock_client.messages.create.call_count == 2
 
     @patch("anthropic.Anthropic")
-    def test_fallback_on_batch_error(
-        self, mock_anthropic_cls: MagicMock
-    ) -> None:
+    def test_fallback_on_batch_error(self, mock_anthropic_cls: MagicMock) -> None:
         """При ошибке в батче — fallback на поштучную обработку."""
         mock_client = MagicMock()
         mock_anthropic_cls.return_value = mock_client
@@ -117,9 +107,7 @@ class TestBatchProcessor:
             MagicMock(content=[MagicMock(text=single_response)]),
         ]
 
-        processor = BatchProcessor(
-            api_key="test-key", batch_size=5, rate_limit_delay=0.0
-        )
+        processor = BatchProcessor(api_key="test-key", batch_size=5, rate_limit_delay=0.0)
         listings = [
             ListingDescription(id="1", text="Без ПТС"),
         ]
@@ -131,9 +119,7 @@ class TestBatchProcessor:
 
     @patch("perekup_helper.batch.anthropic.Anthropic")
     @patch("perekup_helper.categorizer.anthropic.Anthropic")
-    def test_with_price_scoring(
-        self, mock_cat_cls: MagicMock, mock_batch_cls: MagicMock
-    ) -> None:
+    def test_with_price_scoring(self, mock_cat_cls: MagicMock, mock_batch_cls: MagicMock) -> None:
         mock_client = MagicMock()
         mock_batch_cls.return_value = mock_client
 

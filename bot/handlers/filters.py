@@ -26,15 +26,14 @@ class FilterSetup(StatesGroup):
 
 # ── /filters — show current filters and options ──────────────────────
 
+
 @router.message(Command("filters"))
 async def cmd_filters(message: Message, state: FSMContext) -> None:
     await state.clear()
     uid = message.from_user.id
 
     async with async_session() as session:
-        result = await session.execute(
-            select(Filter).where(Filter.telegram_id == uid)
-        )
+        result = await session.execute(select(Filter).where(Filter.telegram_id == uid))
         filters = result.scalars().all()
 
     if filters:
@@ -65,14 +64,12 @@ async def cmd_filters(message: Message, state: FSMContext) -> None:
 
 # ── Add filter flow ──────────────────────────────────────────────────
 
+
 @router.callback_query(F.data == "filter_add")
 async def cb_filter_add(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.set_state(FilterSetup.brand)
-    await callback.message.answer(
-        "Введи марку автомобиля (например: Toyota).\n"
-        "Отправь «-» чтобы пропустить."
-    )
+    await callback.message.answer("Введи марку автомобиля (например: Toyota).\nОтправь «-» чтобы пропустить.")
 
 
 @router.message(FilterSetup.brand)
@@ -80,10 +77,7 @@ async def process_brand(message: Message, state: FSMContext) -> None:
     value = message.text.strip()
     await state.update_data(brand=None if value == "-" else value)
     await state.set_state(FilterSetup.model)
-    await message.answer(
-        "Введи модель (например: Camry).\n"
-        "Отправь «-» чтобы пропустить."
-    )
+    await message.answer("Введи модель (например: Camry).\nОтправь «-» чтобы пропустить.")
 
 
 @router.message(FilterSetup.model)
@@ -91,10 +85,7 @@ async def process_model(message: Message, state: FSMContext) -> None:
     value = message.text.strip()
     await state.update_data(model=None if value == "-" else value)
     await state.set_state(FilterSetup.max_price)
-    await message.answer(
-        "Введи максимальную цену (число, например: 2000000).\n"
-        "Отправь «-» чтобы пропустить."
-    )
+    await message.answer("Введи максимальную цену (число, например: 2000000).\nОтправь «-» чтобы пропустить.")
 
 
 @router.message(FilterSetup.max_price)
@@ -114,8 +105,7 @@ async def process_max_price(message: Message, state: FSMContext) -> None:
 
     await state.set_state(FilterSetup.min_discount)
     await message.answer(
-        "Введи минимальный дисконт от рыночной цены в % (например: 10).\n"
-        "Отправь «-» чтобы пропустить."
+        "Введи минимальный дисконт от рыночной цены в % (например: 10).\nОтправь «-» чтобы пропустить."
     )
 
 
@@ -189,13 +179,12 @@ async def cb_filter_cancel(callback: CallbackQuery, state: FSMContext) -> None:
 
 # ── Clear all filters ────────────────────────────────────────────────
 
+
 @router.callback_query(F.data == "filter_clear")
 async def cb_filter_clear(callback: CallbackQuery) -> None:
     await callback.answer()
     uid = callback.from_user.id
     async with async_session() as session:
-        await session.execute(
-            delete(Filter).where(Filter.telegram_id == uid)
-        )
+        await session.execute(delete(Filter).where(Filter.telegram_id == uid))
         await session.commit()
     await callback.message.answer("Все фильтры удалены.")

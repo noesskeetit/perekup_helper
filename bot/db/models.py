@@ -1,5 +1,4 @@
 import datetime
-from typing import Optional
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Float, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -14,9 +13,7 @@ class User(Base):
 
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Filter(Base):
@@ -24,13 +21,11 @@ class Filter(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
-    brand: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    max_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    min_discount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    brand: Mapped[str | None] = mapped_column(String, nullable=True)
+    model: Mapped[str | None] = mapped_column(String, nullable=True)
+    max_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_discount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class NotificationLog(Base):
@@ -39,6 +34,4 @@ class NotificationLog(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
     listing_url: Mapped[str] = mapped_column(String)
-    sent_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    sent_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())

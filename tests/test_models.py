@@ -30,9 +30,7 @@ async def test_create_filter(db_session):
     db_session.add(f)
     await db_session.commit()
 
-    result = await db_session.execute(
-        select(Filter).where(Filter.telegram_id == 123456)
-    )
+    result = await db_session.execute(select(Filter).where(Filter.telegram_id == 123456))
     filters = result.scalars().all()
     assert len(filters) == 1
     assert filters[0].brand == "Toyota"
@@ -45,9 +43,7 @@ async def test_create_notification_log(db_session):
     db_session.add(log)
     await db_session.commit()
 
-    result = await db_session.execute(
-        select(NotificationLog).where(NotificationLog.telegram_id == 123456)
-    )
+    result = await db_session.execute(select(NotificationLog).where(NotificationLog.telegram_id == 123456))
     logs = result.scalars().all()
     assert len(logs) == 1
     assert logs[0].listing_url == "https://example.com/1"

@@ -8,7 +8,8 @@ bot can be tested end-to-end without a live source.
 
 import dataclasses
 import random
-from typing import List, Optional, Protocol, Sequence
+from collections.abc import Sequence
+from typing import Protocol
 
 
 @dataclasses.dataclass(frozen=True)
@@ -21,7 +22,7 @@ class Listing:
     discount_pct: float
     category: str
     url: str
-    photo_url: Optional[str] = None
+    photo_url: str | None = None
 
 
 class ListingChecker(Protocol):
@@ -43,7 +44,7 @@ class DemoChecker:
     ]
 
     async def fetch_new(self) -> Sequence[Listing]:
-        listings: List[Listing] = []
+        listings: list[Listing] = []
         for _ in range(random.randint(1, 4)):
             brand, model = random.choice(self._BRANDS)
             market_price = random.randint(800_000, 5_000_000)
@@ -59,7 +60,7 @@ class DemoChecker:
                     market_price=market_price,
                     discount_pct=round(discount, 1),
                     category=random.choice(["Седан", "Кроссовер", "Универсал", "Хэтчбек"]),
-                    url="https://example.com/listing/{}".format(random.randint(100000, 999999)),
+                    url=f"https://example.com/listing/{random.randint(100000, 999999)}",
                     photo_url=None,
                 )
             )

@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from typing import Optional
 
 from aiogram import Bot
 from sqlalchemy import select
@@ -22,9 +21,7 @@ def _matches(listing: Listing, f: Filter) -> bool:
         return False
     if f.max_price is not None and listing.price > f.max_price:
         return False
-    if f.min_discount is not None and listing.discount_pct < f.min_discount:
-        return False
-    return True
+    return not (f.min_discount is not None and listing.discount_pct < f.min_discount)
 
 
 def _format_message(listing: Listing) -> str:
@@ -58,13 +55,11 @@ async def _notify_user(
         return
 
     async with async_session() as session:
-        session.add(
-            NotificationLog(telegram_id=telegram_id, listing_url=listing.url)
-        )
+        session.add(NotificationLog(telegram_id=telegram_id, listing_url=listing.url))
         await session.commit()
 
 
-async def run_notifier(bot: Bot, checker: Optional[ListingChecker] = None) -> None:
+async def run_notifier(bot: Bot, checker: ListingChecker | None = None) -> None:
     """Long-running task: fetch listings → match filters → send messages."""
     if checker is None:
         checker = DemoChecker()
@@ -78,24 +73,18 @@ async def run_notifier(bot: Bot, checker: Optional[ListingChecker] = None) -> No
                 continue
 
             async with async_session() as session:
-                result = await session.execute(
-                    select(User).where(User.is_active.is_(True))
-                )
+                result = await session.execute(select(User).where(User.is_active.is_(True)))
                 users = result.scalars().all()
 
                 for user in users:
-                    filters_result = await session.execute(
-                        select(Filter).where(Filter.telegram_id == user.telegram_id)
-                    )
+                    filters_result = await session.execute(select(Filter).where(Filter.telegram_id == user.telegram_id))
                     user_filters = filters_result.scalars().all()
                     if not user_filters:
                         continue
 
                     # Pre-fetch already-sent URLs for this user to avoid duplicates.
                     sent_result = await session.execute(
-                        select(NotificationLog.listing_url).where(
-                            NotificationLog.telegram_id == user.telegram_id
-                        )
+                        select(NotificationLog.listing_url).where(NotificationLog.telegram_id == user.telegram_id)
                     )
                     sent_urls: set[str] = {row[0] for row in sent_result}
 

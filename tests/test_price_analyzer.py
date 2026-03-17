@@ -1,6 +1,6 @@
 """Tests for price deviation calculator."""
 
-from src.avito_parser.price_analyzer import calculate_price_deviation
+from avito_parser.price_analyzer import calculate_price_deviation
 
 
 class TestCalculatePriceDeviation:

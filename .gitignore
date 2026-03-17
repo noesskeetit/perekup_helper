@@ -1,38 +1,9 @@
-# Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
 *.egg-info/
-*.egg
 dist/
 build/
-
-# Virtual environments
+.env
 .venv/
 venv/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# mypy
-.mypy_cache/
-
-# ruff
-.ruff_cache/
-
-# pytest
-.pytest_cache/
-htmlcov/
-.coverage
-coverage.xml
-
-# OS
-.DS_Store
-Thumbs.db
-
-# uv
-uv.lock

@@ -1,97 +1,53 @@
-"""Tests for database models and upsert logic."""
+from __future__ import annotations
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+import pytest
+from sqlalchemy import select
 
-from src.avito_parser.models import Base, CarAd, upsert_car_ad
-
-
-def _make_session() -> Session:
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    factory = sessionmaker(bind=engine)
-    return factory()
+from bot.db.models import Filter, NotificationLog, User
 
 
-class TestUpsertCarAd:
-    def test_insert_new(self):
-        session = _make_session()
-        data = {
-            "external_id": "12345",
-            "url": "https://www.avito.ru/test_12345",
-            "title": "Toyota Camry",
-            "brand": "Toyota",
-            "model": "Camry",
-            "year": 2020,
-            "price": 1500000,
-        }
-        ad = upsert_car_ad(session, data)
-        session.commit()
+@pytest.mark.asyncio
+async def test_create_user(db_session):
+    user = User(telegram_id=123456, is_active=True)
+    db_session.add(user)
+    await db_session.commit()
 
-        assert ad.id is not None
-        assert ad.external_id == "12345"
-        assert ad.brand == "Toyota"
-        assert ad.price == 1500000
+    result = await db_session.get(User, 123456)
+    assert result is not None
+    assert result.telegram_id == 123456
+    assert result.is_active is True
 
-    def test_update_existing(self):
-        session = _make_session()
-        data = {
-            "external_id": "12345",
-            "url": "https://www.avito.ru/test_12345",
-            "title": "Toyota Camry",
-            "price": 1500000,
-        }
-        upsert_car_ad(session, data)
-        session.commit()
 
-        updated_data = {
-            "external_id": "12345",
-            "price": 1400000,
-            "mileage_km": 50000,
-        }
-        ad = upsert_car_ad(session, updated_data)
-        session.commit()
+@pytest.mark.asyncio
+async def test_create_filter(db_session):
+    f = Filter(
+        telegram_id=123456,
+        brand="Toyota",
+        model="Camry",
+        max_price=2_000_000,
+        min_discount=10.0,
+    )
+    db_session.add(f)
+    await db_session.commit()
 
-        assert ad.price == 1400000
-        assert ad.mileage_km == 50000
-        assert ad.title == "Toyota Camry"  # preserved from first insert
+    result = await db_session.execute(
+        select(Filter).where(Filter.telegram_id == 123456)
+    )
+    filters = result.scalars().all()
+    assert len(filters) == 1
+    assert filters[0].brand == "Toyota"
+    assert filters[0].max_price == 2_000_000
 
-        # Should still be one record
-        count = session.query(CarAd).count()
-        assert count == 1
 
-    def test_deduplication(self):
-        session = _make_session()
-        for i in range(3):
-            upsert_car_ad(session, {
-                "external_id": "same_id",
-                "url": "https://www.avito.ru/test_same_id",
-                "price": 1000000 + i * 100000,
-            })
-        session.commit()
+@pytest.mark.asyncio
+async def test_create_notification_log(db_session):
+    log = NotificationLog(telegram_id=123456, listing_url="https://example.com/1")
+    db_session.add(log)
+    await db_session.commit()
 
-        count = session.query(CarAd).count()
-        assert count == 1
-
-        ad = session.query(CarAd).first()
-        assert ad.price == 1200000  # last update
-
-    def test_multiple_distinct_ads(self):
-        session = _make_session()
-        for i in range(5):
-            upsert_car_ad(session, {
-                "external_id": f"ad_{i}",
-                "url": f"https://www.avito.ru/test_{i}",
-                "price": 1000000 * (i + 1),
-            })
-        session.commit()
-
-        count = session.query(CarAd).count()
-        assert count == 5
-
-    def test_missing_external_id_raises(self):
-        session = _make_session()
-        import pytest
-
-        with pytest.raises(ValueError, match="external_id"):
-            upsert_car_ad(session, {"url": "test", "price": 100})
+    result = await db_session.execute(
+        select(NotificationLog).where(NotificationLog.telegram_id == 123456)
+    )
+    logs = result.scalars().all()
+    assert len(logs) == 1
+    assert logs[0].listing_url == "https://example.com/1"

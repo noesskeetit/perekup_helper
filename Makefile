@@ -1,7 +1,7 @@
-.PHONY: dev build run stop clean
+.PHONY: dev build run stop clean test
 
 dev:
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
 build:
 	docker compose build
@@ -14,3 +14,6 @@ stop:
 
 clean:
 	docker compose down -v
+
+test:
+	uv run pytest -v

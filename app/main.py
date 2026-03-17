@@ -1,30 +1,29 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
-from app.database import Base, engine
-from app.routers import listings, stats
+from app.db.session import engine
+from app.models.base import Base
+from app.routes.listings import router as listings_router
 
-Base.metadata.create_all(bind=engine)
+BASE_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(
-    title=settings.app_title,
-    description=settings.app_description,
-    version=settings.app_version,
-)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
 
-app.include_router(listings.router)
-app.include_router(stats.router)
+
+app = FastAPI(title="Perekup Dashboard", version="0.1.0", lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.include_router(listings_router)
 
 
 @app.get("/health")
-def health():
+async def health():
     return {"status": "ok"}

@@ -1,157 +1,149 @@
-import json
+import uuid
+from dataclasses import dataclass, field
+from typing import Optional
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.db.session import get_session
+from app.main import app
+
+
+@dataclass
+class MockAnalysis:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    listing_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    category: str = "clean"
+    confidence: float = 0.95
+    ai_summary: str = "Чистая машина, документы в порядке"
+    flags: list = field(default_factory=list)
+
+
+@dataclass
+class MockListing:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    source: str = "avito"
+    external_id: str = "123456"
+    brand: str = "Toyota"
+    model: str = "Camry"
+    year: int = 2020
+    mileage: int = 50000
+    price: int = 2000000
+    market_price: int = 2200000
+    price_diff_pct: float = -9.1
+    description: str = "Отличная машина"
+    url: str = "https://avito.ru/123"
+    photos: list = field(default_factory=lambda: ["https://img.example.com/1.jpg"])
+    analysis: Optional[MockAnalysis] = None
 
 
 @pytest.fixture
-def mock_listing_html():
-    """Mock Avito listing page HTML with data-marker attributes."""
-    return """
-    <html>
-    <body>
-    <div data-marker="catalog-serp">
-        <div data-marker="item" itemtype="http://schema.org/Product">
-            <a data-marker="item-title" href="/moskva/avtomobili/toyota_camry_2020_12345">
-                Toyota Camry, 2020
-            </a>
-            <meta itemprop="price" content="1500000" />
-            <span data-marker="item-price">1 500 000 ₽</span>
-        </div>
-        <div data-marker="item" itemtype="http://schema.org/Product">
-            <a data-marker="item-title" href="/moskva/avtomobili/bmw_3_series_2019_67890">
-                BMW 3 Series, 2019
-            </a>
-            <meta itemprop="price" content="2300000" />
-            <span data-marker="item-price">2 300 000 ₽</span>
-        </div>
-        <div data-marker="item" itemtype="http://schema.org/Product">
-            <a data-marker="item-title" href="/moskva/avtomobili/kia_rio_2021_11111">
-                Kia Rio, 2021
-            </a>
-            <meta itemprop="price" content="950000" />
-        </div>
-    </div>
-    <a data-marker="pagination-button/nextPage" href="?p=2">Следующая</a>
-    </body>
-    </html>
-    """
+def sample_listings():
+    listing1 = MockListing(brand="Toyota", model="Camry", year=2020, price=2000000)
+    listing1.analysis = MockAnalysis(listing_id=listing1.id, category="clean", confidence=0.95)
+
+    listing2 = MockListing(brand="BMW", model="X5", year=2019, price=3500000, price_diff_pct=8.5)
+    listing2.analysis = MockAnalysis(
+        listing_id=listing2.id, category="damaged_body", confidence=0.72, flags=["Следы ремонта"]
+    )
+
+    listing3 = MockListing(brand="Kia", model="Rio", year=2021, price=1200000, photos=[])
+
+    return [listing1, listing2, listing3]
+
+
+def _build_listings_result(items):
+    """Build mock result that supports result.scalars().all() chain."""
+    scalars_mock = MagicMock()
+    scalars_mock.all = MagicMock(return_value=items)
+
+    result = MagicMock()
+    result.scalars = MagicMock(return_value=scalars_mock)
+    return result
+
+
+def _make_mock_session(listings):
+    mock_session = AsyncMock()
+
+    count_result = MagicMock()
+    count_result.scalar = MagicMock(return_value=len(listings))
+
+    listings_result = _build_listings_result(listings)
+
+    brand_set = sorted({item.brand for item in listings})
+    brands_result = MagicMock()
+    brands_result.all = MagicMock(return_value=[(brand,) for brand in brand_set])
+
+    mock_session.execute = AsyncMock(side_effect=[count_result, listings_result, brands_result])
+    return mock_session
+
+
+def _make_detail_session(listing):
+    mock_session = AsyncMock()
+    detail_result = MagicMock()
+    detail_result.scalar_one_or_none = MagicMock(return_value=listing)
+    mock_session.execute = AsyncMock(return_value=detail_result)
+    return mock_session
 
 
 @pytest.fixture
-def mock_listing_html_json():
-    """Mock Avito listing page with embedded JSON data."""
-    items_data = {
-        "catalog": {
-            "items": [
-                {
-                    "id": 99001,
-                    "title": "Honda Civic, 2022",
-                    "urlPath": "/moskva/avtomobili/honda_civic_2022_99001",
-                    "price": 1800000,
-                },
-                {
-                    "id": 99002,
-                    "title": "Hyundai Solaris, 2020",
-                    "urlPath": "/moskva/avtomobili/hyundai_solaris_2020_99002",
-                    "price": 1100000,
-                },
-            ]
-        }
-    }
-    return f"""
-    <html>
-    <body>
-    <script type="application/json">{json.dumps(items_data)}</script>
-    </body>
-    </html>
-    """
+async def client(sample_listings):
+    mock_session = _make_mock_session(sample_listings)
+
+    async def override_get_session():
+        yield mock_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def mock_card_html():
-    """Mock Avito car ad page HTML."""
-    return """
-    <html>
-    <head>
-    <script type="application/ld+json">
-    {
-        "@type": "Product",
-        "name": "Toyota Camry, 2020",
-        "description": "Отличное состояние, один владелец, полное ТО у дилера",
-        "offers": {"price": "1500000"},
-        "image": ["https://99.img.avito.st/image/1/abc123", "https://99.img.avito.st/image/1/def456"],
-        "vehicleIdentificationNumber": "JTDBR40E600123456"
-    }
-    </script>
-    <meta property="og:image" content="https://99.img.avito.st/image/1/abc123" />
-    </head>
-    <body>
-    <h1 data-marker="item-view/title-info">Toyota Camry, 2020</h1>
-    <span data-marker="item-view/item-price" content="1500000">1 500 000 ₽</span>
+async def client_empty():
+    mock_session = AsyncMock()
 
-    <div data-marker="item-view/item-description">
-        Отличное состояние, один владелец, полное ТО у дилера.
-        Не бит, не крашен. Пробег родной.
-    </div>
+    count_result = MagicMock()
+    count_result.scalar = MagicMock(return_value=0)
 
-    <ul data-marker="item-view/item-params">
-        <li>Марка: Toyota</li>
-        <li>Модель: Camry</li>
-        <li>Год выпуска: 2020</li>
-        <li>Пробег: 45 000 км</li>
-        <li>Тип двигателя: Бензин</li>
-        <li>Объём двигателя: 2.5 л</li>
-        <li>Мощность: 200 л.с.</li>
-        <li>Коробка передач: Автомат</li>
-        <li>Привод: Передний</li>
-        <li>Тип кузова: Седан</li>
-        <li>Цвет: Белый</li>
-        <li>Руль: Левый</li>
-    </ul>
+    empty_listings_result = _build_listings_result([])
 
-    <div data-marker="seller-info/name">Алексей</div>
-    <span data-marker="item-view/item-address">Москва, Центральный район</span>
+    brands_result = MagicMock()
+    brands_result.all = MagicMock(return_value=[])
 
-    <script>var data = {"marketPrice": 1650000};</script>
-    </body>
-    </html>
-    """
+    mock_session.execute = AsyncMock(side_effect=[count_result, empty_listings_result, brands_result])
+
+    async def override_get_session():
+        yield mock_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def mock_card_html_embedded_json():
-    """Mock Avito card page with embedded JSON state."""
-    embedded = {
-        "props": {
-            "item": {
-                "id": 12345,
-                "title": "BMW 3 Series, 2019",
-                "description": "Полный пакет М, спортивные сиденья",
-                "price": 2300000,
-                "location": {"name": "Санкт-Петербург"},
-            },
-            "params": [
-                {"title": "Марка", "value": "BMW"},
-                {"title": "Модель", "value": "3 Series"},
-                {"title": "Год выпуска", "value": "2019"},
-                {"title": "Пробег", "value": "67 000 км"},
-                {"title": "Тип двигателя", "value": "Бензин"},
-                {"title": "Объём двигателя", "value": "2.0 л"},
-                {"title": "Мощность", "value": "184 л.с."},
-                {"title": "Коробка передач", "value": "Автомат"},
-                {"title": "Привод", "value": "Задний"},
-                {"title": "Тип кузова", "value": "Седан"},
-                {"title": "Цвет", "value": "Чёрный"},
-                {"title": "Руль", "value": "Левый"},
-            ],
-        }
-    }
-    vin_data = {"vin": "WBAPH5C55BA123456"}
-    return f"""
-    <html>
-    <body>
-    <script type="application/json">{json.dumps(embedded)}</script>
-    <script>var vinData = {json.dumps(vin_data)};</script>
-    </body>
-    </html>
-    """
+async def detail_client(sample_listings):
+    mock_session = _make_detail_session(sample_listings[0])
+
+    async def override_get_session():
+        yield mock_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def detail_client_empty():
+    mock_session = _make_detail_session(None)
+
+    async def override_get_session():
+        yield mock_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()

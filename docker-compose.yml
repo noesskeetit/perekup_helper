@@ -1,45 +1,29 @@
 services:
-  app:
+  dashboard:
     build: .
     ports:
-      - "8000:8000"
-    env_file:
-      - path: .env
-        required: false
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://perekup:perekup_secret@db:5432/perekup_helper
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
+      db:
         condition: service_healthy
 
-  postgres:
+  db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-perekup}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-perekup_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-perekup_helper}
+      POSTGRES_USER: perekup
+      POSTGRES_PASSWORD: perekup_secret
+      POSTGRES_DB: perekup_helper
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-perekup}"]
+      test: ["CMD-SHELL", "pg_isready -U perekup -d perekup_helper"]
       interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 5
 
 volumes:
-  postgres_data:
-  redis_data:
+  pgdata:

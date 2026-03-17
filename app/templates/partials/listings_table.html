@@ -1,0 +1,103 @@
+{% macro sort_header(column, label) %}
+{% set new_dir = "asc" if sort_by == column and sort_dir == "desc" else "desc" %}
+<th class="sortable" hx-get="/?sort_by={{ column }}&sort_dir={{ new_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">
+    {{ label }}
+    {% if sort_by == column %}
+        <span class="sort-arrow">{{ "&darr;" if sort_dir == "desc" else "&uarr;" }}</span>
+    {% endif %}
+</th>
+{% endmacro %}
+
+<table class="listings-table">
+    <thead>
+        <tr>
+            <th>Фото</th>
+            {{ sort_header("brand", "Марка / Модель") }}
+            {{ sort_header("year", "Год") }}
+            {{ sort_header("price", "Цена") }}
+            {{ sort_header("market_price", "Рыночная") }}
+            {{ sort_header("price_diff_pct", "Отклонение %") }}
+            {{ sort_header("category", "Категория") }}
+            {{ sort_header("confidence", "Скоринг") }}
+        </tr>
+    </thead>
+    <tbody>
+        {% for listing in listings %}
+        {% set cat = listing.analysis.category if listing.analysis else none %}
+        {% set row_class = "" %}
+        {% if cat == "clean" %}
+            {% set row_class = "row-good" %}
+        {% elif cat in ("complex_but_profitable",) %}
+            {% set row_class = "row-complex" %}
+        {% elif cat in ("damaged_body", "bad_docs", "debtor") %}
+            {% set row_class = "row-bad" %}
+        {% endif %}
+        <tr class="listing-row {{ row_class }}" onclick="openDetail('{{ listing.id }}')">
+            <td class="photo-cell">
+                {% if listing.photos and listing.photos | length > 0 %}
+                <img src="{{ listing.photos[0] }}" alt="Фото" loading="lazy">
+                {% else %}
+                <div class="no-photo">Нет фото</div>
+                {% endif %}
+            </td>
+            <td>
+                <strong>{{ listing.brand }}</strong><br>
+                <span class="model-name">{{ listing.model }}</span>
+            </td>
+            <td>{{ listing.year }}</td>
+            <td class="price">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</td>
+            <td class="price">
+                {% if listing.market_price %}
+                {{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;
+                {% else %}
+                <span class="muted">&mdash;</span>
+                {% endif %}
+            </td>
+            <td class="diff-cell">
+                {% if listing.price_diff_pct is not none %}
+                <span class="diff-badge {% if listing.price_diff_pct < -10 %}diff-good{% elif listing.price_diff_pct > 5 %}diff-bad{% else %}diff-neutral{% endif %}">
+                    {{ "%.1f" | format(listing.price_diff_pct) }}%
+                </span>
+                {% else %}
+                <span class="muted">&mdash;</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if listing.analysis %}
+                <span class="category-badge cat-{{ listing.analysis.category }}">
+                    {{ categories.get(listing.analysis.category, listing.analysis.category) }}
+                </span>
+                {% else %}
+                <span class="muted">Нет</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if listing.analysis %}
+                <div class="scoring-bar">
+                    <div class="scoring-fill" style="width: {{ (listing.analysis.confidence * 100) | int }}%"></div>
+                    <span class="scoring-text">{{ "%.0f" | format(listing.analysis.confidence * 100) }}%</span>
+                </div>
+                {% else %}
+                <span class="muted">&mdash;</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="8" class="empty-row">Объявления не найдены</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a class="page-link" hx-get="/?page={{ page - 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">&laquo; Назад</a>
+    {% endif %}
+    <span class="page-info">Стр. {{ page }} из {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a class="page-link" hx-get="/?page={{ page + 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">Вперёд &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}

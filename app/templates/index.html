@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Объявления - Perekup Dashboard{% endblock %}
+{% block content %}
+<div class="filters-panel" id="filters-panel">
+    <form hx-get="/" hx-target="#listings-content" hx-push-url="true">
+        <div class="filters-grid">
+            <div class="filter-group">
+                <label for="brand">Марка</label>
+                <input type="text" name="brand" id="brand" list="brand-list" value="{{ filters.brand }}" placeholder="Все марки">
+                <datalist id="brand-list">
+                    {% for b in brands %}
+                    <option value="{{ b }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div class="filter-group">
+                <label for="car_model">Модель</label>
+                <input type="text" name="car_model" id="car_model" value="{{ filters.car_model }}" placeholder="Все модели">
+            </div>
+            <div class="filter-group">
+                <label>Год</label>
+                <div class="range-inputs">
+                    <input type="number" name="year_from" value="{{ filters.year_from }}" placeholder="от" min="1990" max="2030">
+                    <input type="number" name="year_to" value="{{ filters.year_to }}" placeholder="до" min="1990" max="2030">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Цена</label>
+                <div class="range-inputs">
+                    <input type="number" name="price_from" value="{{ filters.price_from }}" placeholder="от">
+                    <input type="number" name="price_to" value="{{ filters.price_to }}" placeholder="до">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Отклонение %</label>
+                <div class="range-inputs">
+                    <input type="number" name="diff_from" value="{{ filters.diff_from }}" placeholder="от" step="0.1">
+                    <input type="number" name="diff_to" value="{{ filters.diff_to }}" placeholder="до" step="0.1">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label for="category">Категория</label>
+                <select name="category" id="category">
+                    <option value="">Все</option>
+                    {% for key, label in categories.items() %}
+                    <option value="{{ key }}" {% if filters.category == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary">Применить</button>
+            <a href="/" class="btn btn-secondary">Сбросить</a>
+        </div>
+        <input type="hidden" name="sort_by" value="{{ sort_by }}">
+        <input type="hidden" name="sort_dir" value="{{ sort_dir }}">
+    </form>
+</div>
+
+<div class="results-summary">
+    Найдено: <strong>{{ total }}</strong> объявлений
+</div>
+
+<div id="listings-content">
+    {% include "partials/listings_table.html" %}
+</div>
+
+<div id="detail-modal" class="modal" style="display:none">
+    <div class="modal-backdrop" onclick="closeModal()"></div>
+    <div class="modal-content" id="modal-body"></div>
+</div>
+
+<script>
+function openDetail(id) {
+    htmx.ajax('GET', '/listings/' + id, {target: '#modal-body', swap: 'innerHTML'}).then(function() {
+        document.getElementById('detail-modal').style.display = 'flex';
+    });
+}
+function closeModal() {
+    document.getElementById('detail-modal').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+});
+</script>
+{% endblock %}

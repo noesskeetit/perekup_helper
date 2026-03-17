@@ -1,111 +1,97 @@
-"""Тесты моделей данных."""
+"""Tests for database models and upsert logic."""
 
-import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
-from perekup_helper.models import (
-    CATEGORY_BASE_SCORES,
-    CATEGORY_LABELS,
-    CarCategory,
-    CategoryResult,
-    ListingDescription,
-    ScoreResult,
-)
+from src.avito_parser.models import Base, CarAd, upsert_car_ad
 
 
-class TestCarCategory:
-    def test_all_categories_have_labels(self) -> None:
-        for cat in CarCategory:
-            assert cat in CATEGORY_LABELS
-
-    def test_all_categories_have_scores(self) -> None:
-        for cat in CarCategory:
-            assert cat in CATEGORY_BASE_SCORES
-
-    def test_category_values(self) -> None:
-        assert CarCategory.CLEAN.value == "clean"
-        assert CarCategory.JUNK.value == "junk"
-        assert CarCategory.COMPLEX_PROFITABLE.value == "complex_profitable"
-
-    def test_category_from_string(self) -> None:
-        assert CarCategory("clean") == CarCategory.CLEAN
-        assert CarCategory("damaged_body") == CarCategory.DAMAGED_BODY
+def _make_session() -> Session:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    return factory()
 
 
-class TestListingDescription:
-    def test_minimal(self) -> None:
-        listing = ListingDescription(id="1", text="Продам авто")
-        assert listing.id == "1"
-        assert listing.price is None
-        assert listing.market_price is None
+class TestUpsertCarAd:
+    def test_insert_new(self):
+        session = _make_session()
+        data = {
+            "external_id": "12345",
+            "url": "https://www.avito.ru/test_12345",
+            "title": "Toyota Camry",
+            "brand": "Toyota",
+            "model": "Camry",
+            "year": 2020,
+            "price": 1500000,
+        }
+        ad = upsert_car_ad(session, data)
+        session.commit()
 
-    def test_full(self) -> None:
-        listing = ListingDescription(
-            id="abc",
-            text="Продам ВАЗ 2114",
-            price=150_000,
-            market_price=200_000,
-        )
-        assert listing.price == 150_000
-        assert listing.market_price == 200_000
+        assert ad.id is not None
+        assert ad.external_id == "12345"
+        assert ad.brand == "Toyota"
+        assert ad.price == 1500000
 
+    def test_update_existing(self):
+        session = _make_session()
+        data = {
+            "external_id": "12345",
+            "url": "https://www.avito.ru/test_12345",
+            "title": "Toyota Camry",
+            "price": 1500000,
+        }
+        upsert_car_ad(session, data)
+        session.commit()
 
-class TestCategoryResult:
-    def test_valid(self) -> None:
-        result = CategoryResult(
-            category=CarCategory.CLEAN,
-            confidence=0.9,
-            flags=["один хозяин"],
-            reasoning="Чистое объявление",
-        )
-        assert result.category == CarCategory.CLEAN
-        assert result.confidence == 0.9
+        updated_data = {
+            "external_id": "12345",
+            "price": 1400000,
+            "mileage_km": 50000,
+        }
+        ad = upsert_car_ad(session, updated_data)
+        session.commit()
 
-    def test_confidence_bounds(self) -> None:
-        with pytest.raises(Exception):
-            CategoryResult(
-                category=CarCategory.CLEAN,
-                confidence=1.5,
-                flags=[],
-                reasoning="",
-            )
+        assert ad.price == 1400000
+        assert ad.mileage_km == 50000
+        assert ad.title == "Toyota Camry"  # preserved from first insert
 
-    def test_empty_flags(self) -> None:
-        result = CategoryResult(
-            category=CarCategory.JUNK,
-            confidence=0.5,
-            reasoning="Мусор",
-        )
-        assert result.flags == []
+        # Should still be one record
+        count = session.query(CarAd).count()
+        assert count == 1
 
+    def test_deduplication(self):
+        session = _make_session()
+        for i in range(3):
+            upsert_car_ad(session, {
+                "external_id": "same_id",
+                "url": "https://www.avito.ru/test_same_id",
+                "price": 1000000 + i * 100000,
+            })
+        session.commit()
 
-class TestScoreResult:
-    def test_full(self) -> None:
-        cat = CategoryResult(
-            category=CarCategory.CLEAN,
-            confidence=0.95,
-            flags=[],
-            reasoning="ok",
-        )
-        score = ScoreResult(
-            listing_id="1",
-            category_result=cat,
-            price_ratio=0.8,
-            attractiveness_score=8.5,
-        )
-        assert score.listing_id == "1"
-        assert score.price_ratio == 0.8
-        assert 0 <= score.attractiveness_score <= 10
+        count = session.query(CarAd).count()
+        assert count == 1
 
-    def test_no_price_ratio(self) -> None:
-        cat = CategoryResult(
-            category=CarCategory.DAMAGED_BODY,
-            confidence=0.6,
-            flags=["после ДТП"],
-            reasoning="Битый",
-        )
-        score = ScoreResult(
-            listing_id="2",
-            category_result=cat,
-            attractiveness_score=3.0,
-        )
-        assert score.price_ratio is None
+        ad = session.query(CarAd).first()
+        assert ad.price == 1200000  # last update
+
+    def test_multiple_distinct_ads(self):
+        session = _make_session()
+        for i in range(5):
+            upsert_car_ad(session, {
+                "external_id": f"ad_{i}",
+                "url": f"https://www.avito.ru/test_{i}",
+                "price": 1000000 * (i + 1),
+            })
+        session.commit()
+
+        count = session.query(CarAd).count()
+        assert count == 5
+
+    def test_missing_external_id_raises(self):
+        session = _make_session()
+        import pytest
+
+        with pytest.raises(ValueError, match="external_id"):
+            upsert_car_ad(session, {"url": "test", "price": 100})

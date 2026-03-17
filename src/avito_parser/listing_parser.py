@@ -44,13 +44,13 @@ def build_search_url(filters: SearchFilters, page: int = 1) -> str:
     base = "/".join(parts)
 
     params: dict[str, str] = {}
-    if filters.price_from:
+    if filters.price_from is not None:
         params["pmin"] = str(filters.price_from)
-    if filters.price_to:
+    if filters.price_to is not None:
         params["pmax"] = str(filters.price_to)
-    if filters.year_from:
+    if filters.year_from is not None:
         params["params[110000_from]"] = str(filters.year_from)
-    if filters.year_to:
+    if filters.year_to is not None:
         params["params[110000_to]"] = str(filters.year_to)
     if page > 1:
         params["p"] = str(page)

@@ -1,6 +1,7 @@
 """Periodic task scheduler for auto-updating ads."""
 
 import asyncio
+import dataclasses
 import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -40,7 +41,7 @@ def start_scheduler(filters: SearchFilters) -> BackgroundScheduler:
         _run_scrape_job,
         "interval",
         minutes=settings.update_interval_minutes,
-        args=[filters.__dict__],
+        args=[dataclasses.asdict(filters)],
         id="avito_scrape",
         name="Avito auto scraper",
         max_instances=1,

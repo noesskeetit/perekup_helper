@@ -2,20 +2,26 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
-from sqlalchemy import DateTime, Integer, Numeric, String, Text, func
+from sqlalchemy import DateTime, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
+if TYPE_CHECKING:
+    from app.models.listing_analysis import ListingAnalysis
+
 
 class Listing(Base):
     __tablename__ = "listings"
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_listings_source_external_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     brand: Mapped[str] = mapped_column(String(100), nullable=False)
     model: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -34,6 +40,3 @@ class Listing(Base):
     )
 
     analysis: Mapped[Optional[ListingAnalysis]] = relationship(back_populates="listing", uselist=False)
-
-
-from app.models.listing_analysis import ListingAnalysis  # noqa: E402, F401

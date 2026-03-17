@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table(
         "listings",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("source", sa.String(50), nullable=False),
+        sa.Column("source", sa.String(50), nullable=False, index=True),
         sa.Column("external_id", sa.String(255), nullable=False),
         sa.Column("brand", sa.String(100), nullable=False),
         sa.Column("model", sa.String(100), nullable=False),
@@ -39,6 +39,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
+    op.create_unique_constraint("uq_listings_source_external_id", "listings", ["source", "external_id"])
 
     op.create_table(
         "listing_analysis",
@@ -60,4 +61,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("listing_analysis")
+    op.drop_constraint("uq_listings_source_external_id", "listings", type_="unique")
     op.drop_table("listings")

@@ -1,3 +1,1 @@
-"""perekup_helper — AI-агрегатор для перекупов."""
-
-__version__ = "0.1.0"
+"""AI-aggregator for car resellers: parsing auto ads, price analysis, AI categorization."""

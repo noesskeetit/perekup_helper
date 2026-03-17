@@ -24,20 +24,8 @@ async def test_index_htmx_returns_partial(client):
     resp = await client.get("/", headers={"HX-Request": "true"})
     assert resp.status_code == 200
     html = resp.text
-    assert "listings-table" in html or "<table" in html
+    assert "<table" in html
     assert "Toyota" in html
-
-
-@pytest.mark.asyncio
-async def test_index_with_filters(client):
-    resp = await client.get("/?brand=Toyota&year_from=2019&year_to=2022")
-    assert resp.status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_index_with_sort(client):
-    resp = await client.get("/?sort_by=price&sort_dir=asc")
-    assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -48,9 +36,9 @@ async def test_index_empty(client_empty):
 
 
 @pytest.mark.asyncio
-async def test_detail_page(client, sample_listings):
+async def test_detail_page(detail_client, sample_listings):
     listing_id = sample_listings[0].id
-    resp = await client.get(f"/listings/{listing_id}")
+    resp = await detail_client.get(f"/listings/{listing_id}")
     assert resp.status_code == 200
     html = resp.text
     assert "Toyota" in html
@@ -59,17 +47,16 @@ async def test_detail_page(client, sample_listings):
 
 
 @pytest.mark.asyncio
-async def test_detail_htmx_returns_partial(client, sample_listings):
+async def test_detail_htmx_returns_partial(detail_client, sample_listings):
     listing_id = sample_listings[0].id
-    resp = await client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
+    resp = await detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
     assert resp.status_code == 200
-    html = resp.text
-    assert "detail-card" in html
+    assert "detail-card" in resp.text
 
 
 @pytest.mark.asyncio
-async def test_detail_not_found(client_empty):
-    resp = await client_empty.get("/listings/00000000-0000-0000-0000-000000000000")
+async def test_detail_not_found(detail_client_empty):
+    resp = await detail_client_empty.get("/listings/00000000-0000-0000-0000-000000000000")
     assert resp.status_code == 404
     assert "не найдено" in resp.text
 

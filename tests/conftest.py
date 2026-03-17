@@ -53,17 +53,37 @@ def sample_listings():
     return [listing1, listing2, listing3]
 
 
+def _build_listings_result(items):
+    """Build mock result that supports result.scalars().all() chain."""
+    scalars_mock = MagicMock()
+    scalars_mock.all = MagicMock(return_value=items)
+
+    result = MagicMock()
+    result.scalars = MagicMock(return_value=scalars_mock)
+    return result
+
+
 def _make_mock_session(listings):
     mock_session = AsyncMock()
 
-    result_mock = MagicMock()
-    result_mock.scalar.return_value = len(listings)
-    result_mock.scalars.return_value.all.return_value = listings
-    result_mock.scalar_one_or_none.return_value = listings[0] if listings else None
-    unique_brands = {item.brand: item for item in listings}.values()
-    result_mock.all.return_value = [(item.brand,) for item in unique_brands]
+    count_result = MagicMock()
+    count_result.scalar = MagicMock(return_value=len(listings))
 
-    mock_session.execute = AsyncMock(return_value=result_mock)
+    listings_result = _build_listings_result(listings)
+
+    brand_set = sorted({item.brand for item in listings})
+    brands_result = MagicMock()
+    brands_result.all = MagicMock(return_value=[(brand,) for brand in brand_set])
+
+    mock_session.execute = AsyncMock(side_effect=[count_result, listings_result, brands_result])
+    return mock_session
+
+
+def _make_detail_session(listing):
+    mock_session = AsyncMock()
+    detail_result = MagicMock()
+    detail_result.scalar_one_or_none = MagicMock(return_value=listing)
+    mock_session.execute = AsyncMock(return_value=detail_result)
     return mock_session
 
 
@@ -83,12 +103,42 @@ async def client(sample_listings):
 @pytest.fixture
 async def client_empty():
     mock_session = AsyncMock()
-    result_mock = MagicMock()
-    result_mock.scalar.return_value = 0
-    result_mock.scalars.return_value.all.return_value = []
-    result_mock.scalar_one_or_none.return_value = None
-    result_mock.all.return_value = []
-    mock_session.execute = AsyncMock(return_value=result_mock)
+
+    count_result = MagicMock()
+    count_result.scalar = MagicMock(return_value=0)
+
+    empty_listings_result = _build_listings_result([])
+
+    brands_result = MagicMock()
+    brands_result.all = MagicMock(return_value=[])
+
+    mock_session.execute = AsyncMock(side_effect=[count_result, empty_listings_result, brands_result])
+
+    async def override_get_session():
+        yield mock_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def detail_client(sample_listings):
+    mock_session = _make_detail_session(sample_listings[0])
+
+    async def override_get_session():
+        yield mock_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def detail_client_empty():
+    mock_session = _make_detail_session(None)
 
     async def override_get_session():
         yield mock_session

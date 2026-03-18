@@ -10,6 +10,7 @@ class SortBy(str, Enum):
     price_diff = "price_diff"
     score = "score"
     created_at = "created_at"
+    market_diff_pct = "market_diff_pct"
 
 
 class ListingBase(BaseModel):

@@ -1143,6 +1143,13 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiogram", specifier = ">=3.13,<4" },
@@ -1165,6 +1172,13 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24,<1" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", specifier = ">=0.26.0" },
+]
 
 [[package]]
 name = "pluggy"

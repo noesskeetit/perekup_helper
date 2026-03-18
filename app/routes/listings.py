@@ -46,6 +46,7 @@ async def listings_page(
     price_to: int | None = Query(None),
     diff_from: float | None = Query(None),
     diff_to: float | None = Query(None),
+    market_diff_pct_min: float | None = Query(None),
     category: str | None = Query(None),
     sort_by: str = Query("created_at"),
     sort_dir: str = Query("desc"),
@@ -70,6 +71,8 @@ async def listings_page(
         stmt = stmt.where(Listing.price_diff_pct >= diff_from)
     if diff_to is not None:
         stmt = stmt.where(Listing.price_diff_pct <= diff_to)
+    if market_diff_pct_min is not None:
+        stmt = stmt.where(Listing.price_diff_pct <= -market_diff_pct_min)
 
     needs_join = category or sort_by in ("category", "confidence")
     if needs_join:
@@ -108,6 +111,7 @@ async def listings_page(
             "price_to": price_to or "",
             "diff_from": diff_from if diff_from is not None else "",
             "diff_to": diff_to if diff_to is not None else "",
+            "market_diff_pct_min": market_diff_pct_min if market_diff_pct_min is not None else "",
             "category": category or "",
         },
         "sort_by": sort_by,

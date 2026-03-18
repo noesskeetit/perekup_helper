@@ -27,6 +27,9 @@ def list_listings(
     mileage_from: int | None = Query(None, description="Пробег от"),
     mileage_to: int | None = Query(None, description="Пробег до"),
     market_diff_pct: float | None = Query(None, description="Макс. отклонение от рыночной цены (%)"),
+    market_diff_pct_min: float | None = Query(
+        None, description="Мин. % ниже рынка (положительное число, напр. 10 = от 10% ниже рынка)"
+    ),
     category: str | None = Query(None, description="Категория чистоты"),
     sort_by: SortBy = Query(SortBy.created_at, description="Сортировка"),
     page: int = Query(1, ge=1, description="Номер страницы"),
@@ -53,6 +56,8 @@ def list_listings(
         query = query.filter(Listing.mileage <= mileage_to)
     if market_diff_pct is not None:
         query = query.filter(Listing.market_diff_pct <= market_diff_pct)
+    if market_diff_pct_min is not None:
+        query = query.filter(Listing.market_diff_pct <= -market_diff_pct_min)
     if category is not None:
         query = query.filter(Listing.category == category)
 
@@ -60,6 +65,8 @@ def list_listings(
         query = query.order_by(Listing.score.desc())
     elif sort_by == SortBy.price_diff:
         query = query.order_by(Listing.price_diff.asc())
+    elif sort_by == SortBy.market_diff_pct:
+        query = query.order_by(Listing.market_diff_pct.asc())
     else:
         query = query.order_by(Listing.created_at.desc())
 

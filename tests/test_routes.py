@@ -90,7 +90,8 @@ async def test_scoring_bar(async_client):
 async def test_diff_badges(async_client):
     resp = await async_client.get("/")
     html = resp.text
-    assert "diff-good" in html or "diff-bad" in html
+    # Sample data has price_diff_pct between -6.7 and -14.3 (all 5-15% below market → yellow)
+    assert "diff-warning" in html or "diff-good" in html or "diff-bad" in html
 
 
 @pytest.mark.asyncio
@@ -101,5 +102,18 @@ async def test_filter_form_elements(async_client):
     assert 'name="car_model"' in html
     assert 'name="year_from"' in html
     assert 'name="category"' in html
+    assert 'name="market_diff_pct_min"' in html
+    assert "Ниже рынка на" in html
     assert "Применить" in html
     assert "Сбросить" in html
+
+
+@pytest.mark.asyncio
+async def test_market_diff_pct_min_filter(async_client):
+    # Filter: at least 10% below market → price_diff_pct <= -10
+    # Sample data: -11.8, -10.0, -14.3 qualify; -8.0 and -6.7 do not
+    resp = await async_client.get("/", params={"market_diff_pct_min": "10"})
+    assert resp.status_code == 200
+    html = resp.text
+    assert "Toyota" in html  # Camry (-11.8) qualifies
+    assert "Kia" in html  # K5 (-10.0) qualifies

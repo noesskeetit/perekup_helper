@@ -95,14 +95,18 @@ def mock_autoru_card_html_minimal():
 
 class TestParseCardPage:
     def test_json_ld_extraction(self, mock_autoru_card_html):
-        data = parse_card_page(mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/")
+        data = parse_card_page(
+            mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/"
+        )
         assert data["title"] == "Toyota Camry, 2020"
         assert data["price"] == 1500000
         assert data["vin"] == "JTDBR40E600123456"
         assert "Отличное состояние" in data["description"]
 
     def test_embedded_state_params(self, mock_autoru_card_html):
-        data = parse_card_page(mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/")
+        data = parse_card_page(
+            mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/"
+        )
         assert data.get("brand") == "Toyota"
         assert data.get("model") == "Camry"
         assert data.get("year") == 2020
@@ -114,16 +118,22 @@ class TestParseCardPage:
         assert data.get("color") == "Белый"
 
     def test_seller_and_location(self, mock_autoru_card_html):
-        data = parse_card_page(mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/")
+        data = parse_card_page(
+            mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/"
+        )
         assert data.get("seller_name") == "Алексей"
         assert data.get("location") == "Москва"
 
     def test_external_id_from_embedded_state(self, mock_autoru_card_html):
-        data = parse_card_page(mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/")
+        data = parse_card_page(
+            mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/"
+        )
         assert data.get("external_id") == "1234567890-aabbccdd"
 
     def test_market_price_extraction(self, mock_autoru_card_html):
-        data = parse_card_page(mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/")
+        data = parse_card_page(
+            mock_autoru_card_html, "https://auto.ru/cars/used/sale/toyota/camry/1234567890-aabbccdd/"
+        )
         assert data.get("market_price") == 1650000
 
     def test_photo_urls_extraction(self, mock_autoru_card_html):
@@ -134,7 +144,9 @@ class TestParseCardPage:
         assert any("yandex.net" in p for p in photos)
 
     def test_minimal_card(self, mock_autoru_card_html_minimal):
-        data = parse_card_page(mock_autoru_card_html_minimal, "https://auto.ru/cars/used/sale/bmw/3/9876543210-11223344/")
+        data = parse_card_page(
+            mock_autoru_card_html_minimal, "https://auto.ru/cars/used/sale/bmw/3/9876543210-11223344/"
+        )
         assert data.get("brand") == "BMW"
         assert data.get("model") == "3 Series"
         assert data.get("year") == 2019
@@ -143,7 +155,9 @@ class TestParseCardPage:
         assert data.get("vin") == "WBAPH5C55BA123456"
 
     def test_external_id_from_url(self, mock_autoru_card_html_minimal):
-        data = parse_card_page(mock_autoru_card_html_minimal, "https://auto.ru/cars/used/sale/bmw/3/9876543210-11223344/")
+        data = parse_card_page(
+            mock_autoru_card_html_minimal, "https://auto.ru/cars/used/sale/bmw/3/9876543210-11223344/"
+        )
         assert data.get("external_id") == "9876543210-11223344"
 
     def test_empty_page(self):

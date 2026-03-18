@@ -43,6 +43,9 @@
             <td>
                 <strong>{{ listing.brand }}</strong><br>
                 <span class="model-name">{{ listing.model }}</span>
+                {% if listing.is_duplicate %}
+                <span class="duplicate-badge">Дубль</span>
+                {% endif %}
             </td>
             <td>{{ listing.year }}</td>
             <td class="price">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</td>

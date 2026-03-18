@@ -31,6 +31,7 @@ def list_listings(
         None, description="Мин. % ниже рынка (положительное число, напр. 10 = от 10% ниже рынка)"
     ),
     category: str | None = Query(None, description="Категория чистоты"),
+    hide_duplicates: bool = Query(True, description="Скрыть дубликаты (показывать только оригиналы)"),
     sort_by: SortBy = Query(SortBy.created_at, description="Сортировка"),
     page: int = Query(1, ge=1, description="Номер страницы"),
     per_page: int = Query(20, ge=1, le=100, description="Элементов на странице"),
@@ -60,6 +61,8 @@ def list_listings(
         query = query.filter(Listing.market_diff_pct <= -market_diff_pct_min)
     if category is not None:
         query = query.filter(Listing.category == category)
+    if hide_duplicates:
+        query = query.filter(Listing.is_duplicate.is_(False))
 
     if sort_by == SortBy.score:
         query = query.order_by(Listing.score.desc())
@@ -91,4 +94,28 @@ def get_listing(
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if listing is None:
         raise HTTPException(status_code=404, detail="Объявление не найдено")
-    return listing
+
+    # Build duplicate_ids list
+    duplicate_ids: list[int] = []
+    if listing.is_duplicate and listing.canonical_id is not None:
+        # Point to canonical + siblings
+        siblings = (
+            db.query(Listing.id)
+            .filter(
+                Listing.canonical_id == listing.canonical_id,
+                Listing.id != listing.id,
+            )
+            .all()
+        )
+        canonical = db.query(Listing).filter(Listing.id == listing.canonical_id).first()
+        if canonical:
+            duplicate_ids.append(canonical.id)
+        duplicate_ids.extend(row[0] for row in siblings)
+    else:
+        # This is a canonical — find duplicates pointing to it
+        dupes = db.query(Listing.id).filter(Listing.canonical_id == listing.id).all()
+        duplicate_ids.extend(row[0] for row in dupes)
+
+    detail = ListingDetailResponse.model_validate(listing)
+    detail.duplicate_ids = duplicate_ids
+    return detail

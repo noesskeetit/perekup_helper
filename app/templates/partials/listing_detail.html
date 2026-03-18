@@ -8,6 +8,9 @@
             {{ categories.get(listing.analysis.category, listing.analysis.category) }}
         </span>
         {% endif %}
+        {% if listing.is_duplicate %}
+        <span class="duplicate-badge">Дубликат</span>
+        {% endif %}
     </div>
 
     {% if listing.photos and listing.photos | length > 0 %}
@@ -77,6 +80,22 @@
     <div class="detail-description">
         <h3>Описание</h3>
         <p>{{ listing.description }}</p>
+    </div>
+    {% endif %}
+
+    {% if duplicate_listings %}
+    <div class="duplicate-section">
+        <h3>{% if listing.is_duplicate %}Оригинал и другие источники{% else %}Объявление встречается на других площадках{% endif %}</h3>
+        <ul class="duplicate-list">
+            {% for dup in duplicate_listings %}
+            <li>
+                <a href="{{ dup.url }}" target="_blank" rel="noopener">
+                    {{ dup.source }} &mdash; {{ "{:,.0f}".format(dup.price).replace(",", " ") }} &#8381;
+                </a>
+                {% if not dup.is_duplicate %}<span class="canonical-badge">оригинал</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
     </div>
     {% endif %}
 

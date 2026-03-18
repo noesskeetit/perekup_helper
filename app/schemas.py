@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from enum import Enum
 
@@ -26,6 +27,8 @@ class ListingBase(BaseModel):
     category: str | None = None
     source_url: str | None = None
     image_url: str | None = None
+    is_duplicate: bool = False
+    canonical_id: int | None = None
 
 
 class ListingResponse(ListingBase):
@@ -38,6 +41,12 @@ class ListingResponse(ListingBase):
 
 class ListingDetailResponse(ListingResponse):
     ai_analysis: str | None = None
+    duplicate_ids: list[int] = []
+
+
+class DuplicateGroup(BaseModel):
+    canonical_id: uuid.UUID
+    listing_ids: list[uuid.UUID]
 
 
 class PaginatedListings(BaseModel):

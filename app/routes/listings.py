@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_session
-from app.models.listing import Listing, ListingAnalysis
+from app.models.listing import Listing, ListingAnalysis  # noqa: F401
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
@@ -48,6 +48,7 @@ async def listings_page(
     diff_to: float | None = Query(None),
     market_diff_pct_min: float | None = Query(None),
     category: str | None = Query(None),
+    hide_duplicates: bool = Query(True),
     sort_by: str = Query("created_at"),
     sort_dir: str = Query("desc"),
     page: int = Query(1, ge=1),
@@ -73,6 +74,8 @@ async def listings_page(
         stmt = stmt.where(Listing.price_diff_pct <= diff_to)
     if market_diff_pct_min is not None:
         stmt = stmt.where(Listing.price_diff_pct <= -market_diff_pct_min)
+    if hide_duplicates:
+        stmt = stmt.where(Listing.is_duplicate.is_(False))
 
     needs_join = category or sort_by in ("category", "confidence")
     if needs_join:
@@ -113,6 +116,7 @@ async def listings_page(
             "diff_to": diff_to if diff_to is not None else "",
             "market_diff_pct_min": market_diff_pct_min if market_diff_pct_min is not None else "",
             "category": category or "",
+            "hide_duplicates": hide_duplicates,
         },
         "sort_by": sort_by,
         "sort_dir": sort_dir,
@@ -143,9 +147,30 @@ async def listing_detail(
     if listing is None:
         return HTMLResponse("<h2>Объявление не найдено</h2>", status_code=404)
 
+    # Gather related duplicate listings for the detail card
+    duplicate_listings: list[Listing] = []
+    if listing.is_duplicate and listing.canonical_id is not None:
+        canon_stmt = select(Listing).options(selectinload(Listing.analysis)).where(Listing.id == listing.canonical_id)
+        canon_result = await session.execute(canon_stmt)
+        canon = canon_result.scalar_one_or_none()
+        if canon:
+            duplicate_listings.append(canon)
+        siblings_stmt = (
+            select(Listing)
+            .options(selectinload(Listing.analysis))
+            .where(Listing.canonical_id == listing.canonical_id, Listing.id != listing.id)
+        )
+        siblings_result = await session.execute(siblings_stmt)
+        duplicate_listings.extend(siblings_result.scalars().all())
+    else:
+        dupes_stmt = select(Listing).options(selectinload(Listing.analysis)).where(Listing.canonical_id == listing.id)
+        dupes_result = await session.execute(dupes_stmt)
+        duplicate_listings.extend(dupes_result.scalars().all())
+
     ctx = {
         "listing": listing,
         "categories": CATEGORY_LABELS,
+        "duplicate_listings": duplicate_listings,
     }
 
     if request.headers.get("HX-Request"):

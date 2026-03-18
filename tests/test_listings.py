@@ -125,6 +125,31 @@ def test_get_listing_not_found(sync_client, sample_listings):
     assert resp.json()["detail"] == "Объявление не найдено"
 
 
+def test_filter_by_market_diff_pct_min(sync_client, sample_listings):
+    # market_diff_pct_min=10 → market_diff_pct <= -10
+    # Sample data: -11.8, -8.0, -6.7, -10.0, -14.3
+    # Matching (<= -10): -11.8, -10.0, -14.3 → 3 items
+    resp = sync_client.get("/listings", params={"market_diff_pct_min": 10})
+    data = resp.json()
+    assert data["total"] == 3
+    for item in data["items"]:
+        assert item["market_diff_pct"] <= -10
+
+
+def test_filter_by_market_diff_pct_min_zero(sync_client, sample_listings):
+    # 0% threshold → all listings pass
+    resp = sync_client.get("/listings", params={"market_diff_pct_min": 0})
+    data = resp.json()
+    assert data["total"] == 5
+
+
+def test_sort_by_market_diff_pct(sync_client, sample_listings):
+    resp = sync_client.get("/listings", params={"sort_by": "market_diff_pct"})
+    data = resp.json()
+    pcts = [item["market_diff_pct"] for item in data["items"]]
+    assert pcts == sorted(pcts)
+
+
 def test_combined_filters(sync_client, sample_listings):
     resp = sync_client.get(
         "/listings",

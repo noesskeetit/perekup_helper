@@ -150,6 +150,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     font-weight: 600;
 }
 .diff-good { background: var(--good-bg); color: var(--good); border: 1px solid var(--good-border); }
+.diff-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
 .diff-neutral { background: #f9fafb; color: var(--text-muted); border: 1px solid var(--border); }
 .diff-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-border); }
 

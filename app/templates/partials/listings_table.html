@@ -1,6 +1,6 @@
 {% macro sort_header(column, label) %}
 {% set new_dir = "asc" if sort_by == column and sort_dir == "desc" else "desc" %}
-<th class="sortable" hx-get="/?sort_by={{ column }}&sort_dir={{ new_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">
+<th class="sortable" hx-get="/?sort_by={{ column }}&sort_dir={{ new_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&market_diff_pct_min={{ filters.market_diff_pct_min }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">
     {{ label }}
     {% if sort_by == column %}
         <span class="sort-arrow">{{ "&darr;" if sort_dir == "desc" else "&uarr;" }}</span>
@@ -55,7 +55,7 @@
             </td>
             <td class="diff-cell">
                 {% if listing.price_diff_pct is not none %}
-                <span class="diff-badge {% if listing.price_diff_pct < -10 %}diff-good{% elif listing.price_diff_pct > 5 %}diff-bad{% else %}diff-neutral{% endif %}">
+                <span class="diff-badge {% if listing.price_diff_pct < -15 %}diff-good{% elif listing.price_diff_pct < -5 %}diff-warning{% else %}diff-neutral{% endif %}">
                     {{ "%.1f" | format(listing.price_diff_pct) }}%
                 </span>
                 {% else %}
@@ -93,11 +93,11 @@
 {% if total_pages > 1 %}
 <div class="pagination">
     {% if page > 1 %}
-    <a class="page-link" hx-get="/?page={{ page - 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">&laquo; Назад</a>
+    <a class="page-link" hx-get="/?page={{ page - 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&market_diff_pct_min={{ filters.market_diff_pct_min }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">&laquo; Назад</a>
     {% endif %}
     <span class="page-info">Стр. {{ page }} из {{ total_pages }}</span>
     {% if page < total_pages %}
-    <a class="page-link" hx-get="/?page={{ page + 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">Вперёд &raquo;</a>
+    <a class="page-link" hx-get="/?page={{ page + 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}&brand={{ filters.brand }}&car_model={{ filters.car_model }}&year_from={{ filters.year_from }}&year_to={{ filters.year_to }}&price_from={{ filters.price_from }}&price_to={{ filters.price_to }}&diff_from={{ filters.diff_from }}&diff_to={{ filters.diff_to }}&market_diff_pct_min={{ filters.market_diff_pct_min }}&category={{ filters.category }}" hx-target="#listings-content" hx-push-url="true">Вперёд &raquo;</a>
     {% endif %}
 </div>
 {% endif %}

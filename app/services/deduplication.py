@@ -28,9 +28,7 @@ async def detect_and_mark_duplicates(session: AsyncSession) -> int:
 
     Returns the total number of listings newly marked as duplicates.
     """
-    result = await session.execute(
-        select(Listing).order_by(Listing.created_at.asc())
-    )
+    result = await session.execute(select(Listing).order_by(Listing.created_at.asc()))
     listings: list[Listing] = list(result.scalars().all())
 
     # --- group by VIN (non-null, non-empty) ---
@@ -47,9 +45,7 @@ async def detect_and_mark_duplicates(session: AsyncSession) -> int:
     fuzzy_groups: list[list[Listing]] = _fuzzy_group(no_vin)
 
     # Combine all groups that have > 1 member
-    all_groups: list[list[Listing]] = [
-        g for g in list(vin_groups.values()) + fuzzy_groups if len(g) > 1
-    ]
+    all_groups: list[list[Listing]] = [g for g in list(vin_groups.values()) + fuzzy_groups if len(g) > 1]
 
     # Flatten to a set of ids already processed
     marked: set[uuid.UUID] = set()
@@ -129,8 +125,7 @@ def get_duplicate_ids_for(listing: Listing, all_listings: list[Listing]) -> list
         related = [
             lx.id
             for lx in all_listings
-            if lx.id != listing.id
-            and (lx.id == canonical_id or lx.canonical_id == canonical_id)
+            if lx.id != listing.id and (lx.id == canonical_id or lx.canonical_id == canonical_id)
         ]
         return related
 

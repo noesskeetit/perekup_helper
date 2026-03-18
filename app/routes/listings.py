@@ -150,11 +150,7 @@ async def listing_detail(
     # Gather related duplicate listings for the detail card
     duplicate_listings: list[Listing] = []
     if listing.is_duplicate and listing.canonical_id is not None:
-        canon_stmt = (
-            select(Listing)
-            .options(selectinload(Listing.analysis))
-            .where(Listing.id == listing.canonical_id)
-        )
+        canon_stmt = select(Listing).options(selectinload(Listing.analysis)).where(Listing.id == listing.canonical_id)
         canon_result = await session.execute(canon_stmt)
         canon = canon_result.scalar_one_or_none()
         if canon:
@@ -167,11 +163,7 @@ async def listing_detail(
         siblings_result = await session.execute(siblings_stmt)
         duplicate_listings.extend(siblings_result.scalars().all())
     else:
-        dupes_stmt = (
-            select(Listing)
-            .options(selectinload(Listing.analysis))
-            .where(Listing.canonical_id == listing.id)
-        )
+        dupes_stmt = select(Listing).options(selectinload(Listing.analysis)).where(Listing.canonical_id == listing.id)
         dupes_result = await session.execute(dupes_stmt)
         duplicate_listings.extend(dupes_result.scalars().all())
 

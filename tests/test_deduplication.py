@@ -244,9 +244,7 @@ async def test_multiple_vin_groups(session):
     vin_b = "VINBBBB0000000002"
     t0 = datetime(2026, 1, 1, tzinfo=UTC)
 
-    for i, (vin, source) in enumerate(
-        [(vin_a, "avito"), (vin_a, "autoru"), (vin_b, "avito"), (vin_b, "autoru")]
-    ):
+    for i, (vin, source) in enumerate([(vin_a, "avito"), (vin_a, "autoru"), (vin_b, "avito"), (vin_b, "autoru")]):
         session.add(_listing(vin=vin, source=source, created_at=t0 + timedelta(hours=i)))
     await session.commit()
 

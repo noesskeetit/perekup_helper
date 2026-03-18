@@ -113,11 +113,7 @@ def get_listing(
         duplicate_ids.extend(row[0] for row in siblings)
     else:
         # This is a canonical — find duplicates pointing to it
-        dupes = (
-            db.query(Listing.id)
-            .filter(Listing.canonical_id == listing.id)
-            .all()
-        )
+        dupes = db.query(Listing.id).filter(Listing.canonical_id == listing.id).all()
         duplicate_ids.extend(row[0] for row in dupes)
 
     detail = ListingDetailResponse.model_validate(listing)

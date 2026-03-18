@@ -7,6 +7,7 @@ from app.db.session import async_session_factory
 
 from .analysis import analyze_and_save
 from .db import upsert_listing
+from .market_price import update_market_prices
 from .restapp_client import fetch_listings
 
 logger = logging.getLogger(__name__)
@@ -47,12 +48,17 @@ async def run_restapp_pipeline(last_minutes=30, limit=50, **filters):
                 if analysis is not None:
                     result.analyzed += 1
 
+            # Recalculate market prices based on all listings
+            market_updated = await update_market_prices(session)
+            logger.info("Market prices updated for %d listings", market_updated)
+
             await session.commit()
             logger.info(
-                "REST-App pipeline complete: new=%d, updated=%d, analyzed=%d",
+                "REST-App pipeline complete: new=%d, updated=%d, analyzed=%d, market=%d",
                 result.new,
                 result.updated,
                 result.analyzed,
+                market_updated,
             )
         except Exception:
             await session.rollback()

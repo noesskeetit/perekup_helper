@@ -50,8 +50,8 @@ def fetch_listings(last_minutes=30, limit=50, region_id=None, city_id=None, pric
     if query:
         params["q"] = query
 
-    query_string = "&".join("%s=%s" % (k, urllib.parse.quote(str(v))) for k, v in params.items())
-    url = "%s?%s" % (RESTAPP_URL, query_string)
+    query_string = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
+    url = f"{RESTAPP_URL}?{query_string}"
 
     logger.info("Fetching from REST-App.net: last_%dm, limit=%s", last_minutes, limit)
 

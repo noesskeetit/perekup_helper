@@ -41,11 +41,13 @@ def map_card_to_listing(card_data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def upsert_listing(session: AsyncSession, card_data: dict[str, Any]) -> Listing:
+async def upsert_listing(session: AsyncSession, card_data: dict[str, Any]) -> tuple[Listing, bool]:
     """Insert or update a Listing by (source='avito', external_id).
 
     If a record with the same external_id already exists, non-None fields
     are updated. Otherwise a new Listing is inserted.
+
+    Returns (listing, is_new) where is_new is True if the listing was inserted.
     """
     external_id = card_data.get("external_id")
     if not external_id:
@@ -66,9 +68,9 @@ async def upsert_listing(session: AsyncSession, card_data: dict[str, Any]) -> Li
             if value is not None:
                 setattr(existing, key, value)
         logger.debug("Updated listing external_id=%s", external_id)
-        return existing
+        return existing, False
 
     listing = Listing(**fields)
     session.add(listing)
     logger.debug("Inserted listing external_id=%s", external_id)
-    return listing
+    return listing, True

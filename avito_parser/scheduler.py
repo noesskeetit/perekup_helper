@@ -20,8 +20,13 @@ def _run_scrape_job(filters_dict: dict):
     filters = SearchFilters(**filters_dict)
     loop = asyncio.new_event_loop()
     try:
-        count = loop.run_until_complete(scrape_and_save(filters))
-        logger.info("Periodic scrape complete: %d ads saved/updated", count)
+        result = loop.run_until_complete(scrape_and_save(filters))
+        logger.info(
+            "Periodic scrape complete: new=%d, updated=%d, analyzed=%d",
+            result.new,
+            result.updated,
+            result.analyzed,
+        )
     except Exception as e:
         logger.error("Periodic scrape failed: %s", e)
     finally:

@@ -2,6 +2,7 @@
 
 import json
 import logging
+from dataclasses import dataclass, field
 
 from app.db.session import async_session_factory
 
@@ -20,6 +21,19 @@ from .listing_parser import (
 from .price_analyzer import calculate_price_deviation
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PipelineResult:
+    """Counts from a single pipeline run."""
+
+    new: int = field(default=0)
+    updated: int = field(default=0)
+    analyzed: int = field(default=0)
+
+    @property
+    def total(self) -> int:
+        return self.new + self.updated
 
 
 async def scrape_listings(filters: SearchFilters, client: AvitoHttpClient) -> list[ListingItem]:
@@ -50,10 +64,10 @@ async def scrape_listings(filters: SearchFilters, client: AvitoHttpClient) -> li
     return all_items
 
 
-async def scrape_and_save(filters: SearchFilters) -> int:
+async def scrape_and_save(filters: SearchFilters) -> PipelineResult:
     """Full pipeline: scrape listings, parse cards, save to DB."""
     client = AvitoHttpClient()
-    saved_count = 0
+    result = PipelineResult()
 
     try:
         items = await scrape_listings(filters, client)
@@ -64,19 +78,29 @@ async def scrape_and_save(filters: SearchFilters) -> int:
                 for item in items:
                     card_data = await _process_card(client, item)
                     if card_data:
-                        listing = await upsert_listing(session, card_data)
-                        saved_count += 1
-                        await analyze_and_save(session, listing)
+                        listing, is_new = await upsert_listing(session, card_data)
+                        if is_new:
+                            result.new += 1
+                        else:
+                            result.updated += 1
+                        analysis = await analyze_and_save(session, listing)
+                        if analysis is not None:
+                            result.analyzed += 1
 
                 await session.commit()
-                logger.info("Saved/updated %d listings", saved_count)
+                logger.info(
+                    "Pipeline complete: new=%d, updated=%d, analyzed=%d",
+                    result.new,
+                    result.updated,
+                    result.analyzed,
+                )
             except Exception:
                 await session.rollback()
                 raise
     finally:
         await client.close()
 
-    return saved_count
+    return result
 
 
 async def _process_card(client: AvitoHttpClient, item: ListingItem) -> dict | None:

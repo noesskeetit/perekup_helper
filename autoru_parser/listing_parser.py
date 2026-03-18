@@ -87,7 +87,7 @@ def _extract_from_initial_state(html: str) -> list[ListingItem]:
             pass
 
     # Try window.__initialState__ = {...}
-    ws_pattern = re.compile(r'window\.__initialState__\s*=\s*(\{.*?\})\s*;', re.DOTALL)
+    ws_pattern = re.compile(r"window\.__initialState__\s*=\s*(\{.*?\})\s*;", re.DOTALL)
     match = ws_pattern.search(html)
     if match:
         try:

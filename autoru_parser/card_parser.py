@@ -122,7 +122,7 @@ def _extract_embedded_state(html: str, soup: BeautifulSoup) -> dict | None:
             pass
 
     # Try window.__initialState__ = {...}
-    ws_pattern = re.compile(r'window\.__initialState__\s*=\s*(\{.*?\})\s*;', re.DOTALL)
+    ws_pattern = re.compile(r"window\.__initialState__\s*=\s*(\{.*?\})\s*;", re.DOTALL)
     match = ws_pattern.search(html)
     if match:
         try:
@@ -335,7 +335,9 @@ def _extract_photos(soup: BeautifulSoup, html: str) -> list[str]:
 
     # auto.ru uses Yandex image CDN
     img_patterns = [
-        re.compile(r'"(https://[^"]*(?:avatars\.mds\.yandex\.net|img\.autoru\.yandex)[^"]*(?:1200x900|orig|full)[^"]*)"'),
+        re.compile(
+            r'"(https://[^"]*(?:avatars\.mds\.yandex\.net|img\.autoru\.yandex)[^"]*(?:1200x900|orig|full)[^"]*)"'
+        ),
         re.compile(r'"(https://[^"]*avatars\.mds\.yandex\.net[^"]*)"'),
     ]
     for pattern in img_patterns:

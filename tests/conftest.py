@@ -396,7 +396,7 @@ def _make_async_listings():
             price_diff_pct=-11.8,
             description="Один владелец",
             url="https://example.com/1",
-            photos=None,
+            photos=["https://example.com/photo1.jpg", "https://example.com/photo2.jpg"],
             raw_data=None,
         ),
         Listing(

@@ -117,3 +117,45 @@ async def test_market_diff_pct_min_filter(async_client):
     html = resp.text
     assert "Toyota" in html  # Camry (-11.8) qualifies
     assert "Kia" in html  # K5 (-10.0) qualifies
+
+
+@pytest.mark.asyncio
+async def test_photo_preview_in_table(async_client):
+    """Table shows <img> for listings that have photos."""
+    resp = await async_client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+    # Toyota Camry (id[0]) has photos in conftest; expect an <img> tag
+    assert "photo-cell" in html
+    assert "<img" in html
+    assert "example.com/photo1.jpg" in html
+
+
+@pytest.mark.asyncio
+async def test_no_photo_placeholder(async_client):
+    """Table shows 'Нет фото' placeholder for listings without photos."""
+    resp = await async_client.get("/")
+    assert resp.status_code == 200
+    # Other listings have photos=None → placeholder rendered
+    assert "no-photo" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_photo_gallery_in_detail(async_detail_client):
+    """Detail card shows photo gallery when listing has photos."""
+    listing_id = "11111111-1111-1111-1111-111111111111"  # Toyota Camry with photos
+    resp = await async_detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.text
+    assert "detail-photos" in html
+    assert "<img" in html
+    assert "example.com/photo1.jpg" in html
+
+
+@pytest.mark.asyncio
+async def test_no_gallery_without_photos(async_detail_client):
+    """Detail card does not show gallery when listing has no photos."""
+    listing_id = "22222222-2222-2222-2222-222222222222"  # RAV4 with photos=None
+    resp = await async_detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    assert "detail-photos" not in resp.text

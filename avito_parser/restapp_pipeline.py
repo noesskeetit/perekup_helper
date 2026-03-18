@@ -50,7 +50,9 @@ async def run_restapp_pipeline(last_minutes=30, limit=50, **filters):
             await session.commit()
             logger.info(
                 "REST-App pipeline complete: new=%d, updated=%d, analyzed=%d",
-                result.new, result.updated, result.analyzed,
+                result.new,
+                result.updated,
+                result.analyzed,
             )
         except Exception:
             await session.rollback()

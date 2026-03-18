@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String, Text, Uuid, func
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -54,6 +54,7 @@ class ListingAnalysis(Base):
     confidence: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     flags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     listing: Mapped[Listing] = relationship(back_populates="analysis")

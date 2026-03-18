@@ -5,6 +5,7 @@ import logging
 
 from app.db.session import async_session_factory
 
+from .analysis import analyze_and_save
 from .card_parser import parse_card_page
 from .config import settings
 from .db import upsert_listing
@@ -63,8 +64,9 @@ async def scrape_and_save(filters: SearchFilters) -> int:
                 for item in items:
                     card_data = await _process_card(client, item)
                     if card_data:
-                        await upsert_listing(session, card_data)
+                        listing = await upsert_listing(session, card_data)
                         saved_count += 1
+                        await analyze_and_save(session, listing)
 
                 await session.commit()
                 logger.info("Saved/updated %d listings", saved_count)

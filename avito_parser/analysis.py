@@ -22,9 +22,7 @@ async def analyze_and_save(session: AsyncSession, listing: Listing) -> ListingAn
     Пропускает объявления, у которых анализ уже есть.
     При ошибке категоризации логирует и возвращает None (не падает весь pipeline).
     """
-    existing = await session.scalar(
-        select(ListingAnalysis).where(ListingAnalysis.listing_id == listing.id)
-    )
+    existing = await session.scalar(select(ListingAnalysis).where(ListingAnalysis.listing_id == listing.id))
     if existing is not None:
         logger.debug("Анализ уже существует для listing %s, пропускаем", listing.id)
         return None

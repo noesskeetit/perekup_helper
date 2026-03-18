@@ -97,9 +97,7 @@ class TestAnalyzeAndSave:
         await analysis_session.flush()
 
         count = await analysis_session.scalar(
-            select(func.count()).select_from(ListingAnalysis).where(
-                ListingAnalysis.listing_id == sample_listing.id
-            )
+            select(func.count()).select_from(ListingAnalysis).where(ListingAnalysis.listing_id == sample_listing.id)
         )
         assert count == 1
 
@@ -149,9 +147,7 @@ class TestAnalyzeAndSave:
         assert result2 is None
 
         count = await analysis_session.scalar(
-            select(func.count()).select_from(ListingAnalysis).where(
-                ListingAnalysis.listing_id == sample_listing.id
-            )
+            select(func.count()).select_from(ListingAnalysis).where(ListingAnalysis.listing_id == sample_listing.id)
         )
         assert count == 1
 
@@ -171,9 +167,7 @@ class TestAnalyzeAndSave:
         assert result is None
 
         count = await analysis_session.scalar(
-            select(func.count()).select_from(ListingAnalysis).where(
-                ListingAnalysis.listing_id == sample_listing.id
-            )
+            select(func.count()).select_from(ListingAnalysis).where(ListingAnalysis.listing_id == sample_listing.id)
         )
         assert count == 0
 
@@ -225,9 +219,7 @@ class TestAnalyzeAndSave:
         assert "X5" in call_args.text
 
     @patch("avito_parser.analysis.Categorizer")
-    async def test_stores_all_car_categories(
-        self, mock_cat_cls: MagicMock, analysis_session: AsyncSession
-    ) -> None:
+    async def test_stores_all_car_categories(self, mock_cat_cls: MagicMock, analysis_session: AsyncSession) -> None:
         """All CarCategory values can be stored in listing_analysis.category."""
         for cat in CarCategory:
             listing = Listing(

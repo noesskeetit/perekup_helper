@@ -93,9 +93,10 @@ class TestMapCardToListing:
 
 class TestUpsertListing:
     async def test_inserts_new_listing(self, listing_session):
-        listing = await upsert_listing(listing_session, SAMPLE_CARD)
+        listing, is_new = await upsert_listing(listing_session, SAMPLE_CARD)
         await listing_session.flush()
 
+        assert is_new is True
         assert listing.external_id == "12345"
         assert listing.source == "avito"
         assert listing.brand == "Toyota"
@@ -106,9 +107,10 @@ class TestUpsertListing:
         await listing_session.flush()
 
         updated_card = dict(SAMPLE_CARD, price=1400000, description="Снижена цена")
-        listing = await upsert_listing(listing_session, updated_card)
+        listing, is_new = await upsert_listing(listing_session, updated_card)
         await listing_session.flush()
 
+        assert is_new is False
         assert listing.price == 1400000
         assert listing.description == "Снижена цена"
 

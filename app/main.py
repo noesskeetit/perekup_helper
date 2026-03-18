@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.db.session import engine
 from app.models.base import Base
 from app.routes.listings import router as listings_router
+from app.scheduler import start_scheduler, stop_scheduler
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -15,7 +16,9 @@ BASE_DIR = Path(__file__).resolve().parent
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 app = FastAPI(title="Perekup Dashboard", version="0.1.0", lifespan=lifespan)

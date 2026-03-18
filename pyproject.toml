@@ -33,7 +33,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["app*", "bot*", "perekup_helper*", "avito_parser*"]
+include = ["app*", "bot*", "perekup_helper*", "avito_parser*", "autoru_parser*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -131,9 +131,7 @@ class TestUpsertListing:
         await upsert_listing(listing_session, card_b)
         await listing_session.flush()
 
-        count = await listing_session.scalar(
-            select(func.count()).select_from(Listing).where(Listing.source == "avito")
-        )
+        count = await listing_session.scalar(select(func.count()).select_from(Listing).where(Listing.source == "avito"))
         assert count == 2
 
     async def test_raises_without_external_id(self, listing_session):

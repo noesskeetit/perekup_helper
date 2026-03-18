@@ -3,8 +3,11 @@
 import json
 import logging
 
+from app.db.session import async_session_factory
+
 from .card_parser import parse_card_page
 from .config import settings
+from .db import upsert_listing
 from .http_client import AvitoHttpClient
 from .listing_parser import (
     ListingItem,
@@ -13,7 +16,6 @@ from .listing_parser import (
     has_next_page,
     parse_listing_page,
 )
-from .models import get_session_factory, upsert_car_ad
 from .price_analyzer import calculate_price_deviation
 
 logger = logging.getLogger(__name__)
@@ -50,28 +52,25 @@ async def scrape_listings(filters: SearchFilters, client: AvitoHttpClient) -> li
 async def scrape_and_save(filters: SearchFilters) -> int:
     """Full pipeline: scrape listings, parse cards, save to DB."""
     client = AvitoHttpClient()
-    session_factory = get_session_factory()
     saved_count = 0
 
     try:
         items = await scrape_listings(filters, client)
         logger.info("Total listing items found: %d", len(items))
 
-        session = session_factory()
-        try:
-            for item in items:
-                card_data = await _process_card(client, item)
-                if card_data:
-                    upsert_car_ad(session, card_data)
-                    saved_count += 1
+        async with async_session_factory() as session:
+            try:
+                for item in items:
+                    card_data = await _process_card(client, item)
+                    if card_data:
+                        await upsert_listing(session, card_data)
+                        saved_count += 1
 
-            session.commit()
-            logger.info("Saved/updated %d car ads", saved_count)
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+                await session.commit()
+                logger.info("Saved/updated %d listings", saved_count)
+            except Exception:
+                await session.rollback()
+                raise
     finally:
         await client.close()
 

@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Uuid, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -35,6 +35,9 @@ class Listing(Base):
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     photos: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     raw_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    vin: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    canonical_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

@@ -169,6 +169,33 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-border);
 }
 
+/* Duplicate badge */
+.duplicate-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    margin-left: 4px;
+}
+.canonical-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    background: var(--good-bg);
+    color: var(--good);
+    border: 1px solid var(--good-border);
+    margin-left: 4px;
+}
+.duplicate-section { margin: 16px 0; }
+.duplicate-section h3 { font-size: 1rem; margin-bottom: 8px; }
+.duplicate-list { list-style: none; padding: 0; margin: 0; }
+.duplicate-list li { padding: 4px 0; font-size: 0.9rem; }
+
 /* Scoring bar */
 .scoring-bar {
     position: relative;

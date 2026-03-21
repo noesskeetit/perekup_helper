@@ -79,11 +79,12 @@ async def test_category_badges(async_client):
 
 
 @pytest.mark.asyncio
-async def test_scoring_bar(async_client):
+async def test_score_display(async_client):
+    """Scoring column shows confidence as a colored number."""
     resp = await async_client.get("/")
     html = resp.text
-    assert "scoring-bar" in html
-    assert "scoring-fill" in html
+    assert "score-value" in html
+    assert "95%" in html  # Toyota Camry confidence=0.95
 
 
 @pytest.mark.asyncio
@@ -159,3 +160,37 @@ async def test_no_gallery_without_photos(async_detail_client):
     resp = await async_detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
     assert resp.status_code == 200
     assert "detail-photos" not in resp.text
+
+
+@pytest.mark.asyncio
+async def test_ai_analysis_in_detail(async_detail_client):
+    """Detail card shows AI analysis block with summary and confidence."""
+    listing_id = "11111111-1111-1111-1111-111111111111"  # Toyota Camry with analysis
+    resp = await async_detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.text
+    assert "ai-analysis" in html
+    assert "AI-" in html  # AI-Анализ heading
+    assert "95%" in html  # confidence=0.95
+
+
+@pytest.mark.asyncio
+async def test_flags_as_tags_in_detail(async_detail_client):
+    """Detail card shows flags as tag badges, not a plain list."""
+    listing_id = "33333333-3333-3333-3333-333333333333"  # BMW X5 with flags=["после ДТП"]
+    resp = await async_detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.text
+    assert "flag-tag" in html
+    assert "после ДТП" in html
+
+
+@pytest.mark.asyncio
+async def test_price_diff_rubles_in_detail(async_detail_client):
+    """Detail card shows price difference in rubles."""
+    listing_id = "11111111-1111-1111-1111-111111111111"  # Toyota: price=1500000, market=1700000
+    resp = await async_detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.text
+    assert "price-diff-abs" in html
+    assert "200" in html  # 200 000 ruble difference

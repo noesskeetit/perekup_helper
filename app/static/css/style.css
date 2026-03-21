@@ -129,10 +129,10 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 .row-bad:hover { background: #fee2e2; }
 
 /* Photo */
-.photo-cell { width: 80px; }
-.photo-cell img { width: 70px; height: 50px; object-fit: cover; border-radius: 4px; }
+.photo-cell { width: 72px; }
+.photo-cell img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
 .no-photo {
-    width: 70px; height: 50px; background: var(--bg);
+    width: 60px; height: 60px; background: var(--bg);
     border-radius: 4px; display: flex; align-items: center;
     justify-content: center; font-size: 0.7rem; color: var(--text-muted);
 }
@@ -196,29 +196,17 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 .duplicate-list { list-style: none; padding: 0; margin: 0; }
 .duplicate-list li { padding: 4px 0; font-size: 0.9rem; }
 
-/* Scoring bar */
-.scoring-bar {
-    position: relative;
-    width: 70px;
-    height: 20px;
-    background: var(--bg);
-    border-radius: 10px;
-    overflow: hidden;
-}
-.scoring-fill {
-    height: 100%;
-    background: var(--primary);
-    border-radius: 10px;
-    transition: width 0.3s;
-}
-.scoring-text {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 0.7rem;
+/* Score value */
+.score-value {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85rem;
     font-weight: 700;
-    color: var(--text);
 }
+.score-high { color: var(--good); background: var(--good-bg); border: 1px solid var(--good-border); }
+.score-mid { color: var(--warning); background: var(--warning-bg); border: 1px solid var(--warning-border); }
+.score-low { color: var(--bad); background: var(--bad-bg); border: 1px solid var(--bad-border); }
 
 .empty-row { text-align: center; padding: 40px; color: var(--text-muted); }
 
@@ -327,8 +315,20 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 
 .flags { margin-top: 10px; }
 .flags h4 { font-size: 0.9rem; color: var(--bad); margin-bottom: 6px; }
-.flags ul { padding-left: 20px; }
-.flags li { margin-bottom: 4px; }
+.flag-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.flag-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--bad-bg);
+    color: var(--bad);
+    border: 1px solid var(--bad-border);
+}
+
+/* Price difference absolute */
+.price-diff-abs { font-size: 1rem; }
 
 .detail-description { margin-bottom: 20px; }
 .detail-description h3 { font-size: 1rem; margin-bottom: 8px; }

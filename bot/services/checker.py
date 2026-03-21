@@ -1,15 +1,25 @@
-"""Stub module for listing source integration.
+"""Listing source integration.
 
-This module defines the interface that a concrete listing source must implement.
-A real implementation would scrape or call an API (Avito, Auto.ru, etc.) and
-return ``Listing`` objects.  The ``DemoChecker`` returns synthetic data so the
-bot can be tested end-to-end without a live source.
+This module defines the interface that a concrete listing source must implement
+and provides two implementations:
+
+* ``DemoChecker`` — returns synthetic data for end-to-end testing.
+* ``DatabaseChecker`` — queries the main app PostgreSQL database for real listings.
 """
+
+from __future__ import annotations
 
 import dataclasses
 import random
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Protocol
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import joinedload
+
+from app.models.listing import Listing as AppListing
 
 
 @dataclasses.dataclass(frozen=True)
@@ -27,6 +37,88 @@ class Listing:
 
 class ListingChecker(Protocol):
     async def fetch_new(self) -> Sequence[Listing]: ...
+
+
+class DatabaseChecker:
+    """Fetches real listings from the main app database (listings + listing_analysis)."""
+
+    def __init__(
+        self,
+        db_url: str | None = None,
+        *,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
+    ):
+        if session_factory is not None:
+            self._session_factory = session_factory
+        elif db_url is not None:
+            engine = create_async_engine(db_url, echo=False)
+            self._session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        else:
+            raise ValueError("Either db_url or session_factory must be provided")
+        self._last_check: datetime | None = None
+
+    async def fetch_new(
+        self,
+        *,
+        brand: str | None = None,
+        model: str | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> Sequence[Listing]:
+        async with self._session_factory() as session:
+            stmt = (
+                select(AppListing)
+                .where(AppListing.is_duplicate.is_(False))
+                .options(joinedload(AppListing.analysis))
+            )
+
+            if self._last_check is not None:
+                stmt = stmt.where(AppListing.created_at > self._last_check)
+
+            if brand is not None:
+                stmt = stmt.where(func.lower(AppListing.brand) == brand.lower())
+
+            if model is not None:
+                stmt = stmt.where(func.lower(AppListing.model) == model.lower())
+
+            if max_price is not None:
+                stmt = stmt.where(AppListing.price <= max_price)
+
+            if min_discount is not None:
+                # price_diff_pct is negative (e.g. -10.0 means 10% below market)
+                stmt = stmt.where(AppListing.price_diff_pct <= -min_discount)
+
+            result = await session.execute(stmt)
+            rows = result.scalars().unique().all()
+
+            self._last_check = datetime.now(UTC)
+
+            return [self._to_listing(row) for row in rows]
+
+    @staticmethod
+    def _to_listing(db_listing: AppListing) -> Listing:
+        category = ""
+        if db_listing.analysis:
+            cat = db_listing.analysis.category
+            category = cat.value if hasattr(cat, "value") else str(cat)
+
+        photo_url = None
+        if db_listing.photos:
+            photo_url = db_listing.photos[0]
+
+        discount_pct = abs(float(db_listing.price_diff_pct)) if db_listing.price_diff_pct else 0.0
+
+        return Listing(
+            brand=db_listing.brand,
+            model=db_listing.model,
+            year=db_listing.year,
+            price=float(db_listing.price),
+            market_price=float(db_listing.market_price) if db_listing.market_price else float(db_listing.price),
+            discount_pct=round(discount_pct, 1),
+            category=category,
+            url=db_listing.url,
+            photo_url=photo_url,
+        )
 
 
 class DemoChecker:

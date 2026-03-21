@@ -8,6 +8,7 @@
 </th>
 {% endmacro %}
 
+{# ── Table view ── #}
 <table class="listings-table">
     <thead>
         <tr>
@@ -92,6 +93,63 @@
         {% endfor %}
     </tbody>
 </table>
+
+{# ── Cards grid view ── #}
+<div class="cards-grid" style="display:none">
+    {% for listing in listings %}
+    {% set cat = listing.analysis.category if listing.analysis else none %}
+    {% set card_class = "" %}
+    {% if cat == "clean" %}
+        {% set card_class = "card-good" %}
+    {% elif cat in ("complex_but_profitable",) %}
+        {% set card_class = "card-complex" %}
+    {% elif cat in ("damaged_body", "bad_docs", "debtor") %}
+        {% set card_class = "card-bad" %}
+    {% endif %}
+    <div class="listing-card {{ card_class }}" onclick="openDetail('{{ listing.id }}')">
+        <div class="card-photo">
+            {% if listing.photos and listing.photos | length > 0 %}
+            <img src="{{ listing.photos[0] }}" alt="{{ listing.brand }} {{ listing.model }}" loading="lazy">
+            {% else %}
+            <div class="no-photo-card">Нет фото</div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="card-title">
+                <strong>{{ listing.brand }}</strong> {{ listing.model }}
+                {% if listing.is_duplicate %}
+                <span class="duplicate-badge">Дубль</span>
+                {% endif %}
+            </div>
+            <div class="card-year">{{ listing.year }} г.</div>
+            <div class="card-prices">
+                <span class="card-price">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</span>
+                <span class="card-market">
+                    {% if listing.market_price %}
+                    {{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;
+                    {% else %}
+                    &mdash;
+                    {% endif %}
+                </span>
+            </div>
+            <div class="card-badges">
+                {% if listing.price_diff_pct is not none %}
+                <span class="diff-badge {% if listing.price_diff_pct < -15 %}diff-good{% elif listing.price_diff_pct < -5 %}diff-warning{% else %}diff-neutral{% endif %}">
+                    {{ "%.1f" | format(listing.price_diff_pct) }}%
+                </span>
+                {% endif %}
+                {% if listing.analysis %}
+                <span class="category-badge cat-{{ listing.analysis.category }}">
+                    {{ categories.get(listing.analysis.category, listing.analysis.category) }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="cards-empty">Объявления не найдены</div>
+    {% endfor %}
+</div>
 
 {% if total_pages > 1 %}
 <div class="pagination">

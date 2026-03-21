@@ -71,8 +71,14 @@
     </form>
 </div>
 
-<div class="results-summary">
-    Найдено: <strong>{{ total }}</strong> объявлений
+<div class="results-bar">
+    <div class="results-summary">
+        Найдено: <strong>{{ total }}</strong> объявлений
+    </div>
+    <div class="view-toggle">
+        <button class="view-btn active" data-view="list" title="Таблица">&#9776;</button>
+        <button class="view-btn" data-view="grid" title="Карточки">&#9638;</button>
+    </div>
 </div>
 
 <div id="listings-content">
@@ -96,5 +102,49 @@ function closeModal() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeModal();
 });
+
+/* View toggle: grid / list with localStorage persistence */
+(function() {
+    var KEY = 'viewPreference';
+
+    function applyView(view) {
+        var table = document.querySelector('.listings-table');
+        var grid = document.querySelector('.cards-grid');
+        if (!table || !grid) return;
+        if (view === 'grid') {
+            table.style.display = 'none';
+            grid.style.display = '';
+        } else {
+            table.style.display = '';
+            grid.style.display = 'none';
+        }
+        document.querySelectorAll('.view-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+        });
+    }
+
+    function init() {
+        var saved = localStorage.getItem(KEY) || 'list';
+        applyView(saved);
+        document.querySelectorAll('.view-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var view = this.getAttribute('data-view');
+                localStorage.setItem(KEY, view);
+                applyView(view);
+            });
+        });
+    }
+
+    /* Run on initial load */
+    init();
+
+    /* Re-run after HTMX swaps new content into #listings-content */
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (e.detail.target && e.detail.target.id === 'listings-content') {
+            var saved = localStorage.getItem(KEY) || 'list';
+            applyView(saved);
+        }
+    });
+})();
 </script>
 {% endblock %}

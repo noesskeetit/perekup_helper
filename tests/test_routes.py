@@ -194,3 +194,92 @@ async def test_price_diff_rubles_in_detail(async_detail_client):
     html = resp.text
     assert "price-diff-abs" in html
     assert "200" in html  # 200 000 ruble difference
+
+
+# ---------------------------------------------------------------------------
+# Card layout / grid-list view toggle (ALE-31)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_view_toggle_buttons_present(async_client):
+    """Dashboard has grid/list view toggle buttons."""
+    resp = await async_client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+    assert "view-toggle" in html
+    assert 'data-view="grid"' in html
+    assert 'data-view="list"' in html
+
+
+@pytest.mark.asyncio
+async def test_cards_grid_present(async_client):
+    """Dashboard renders a cards grid container alongside the table."""
+    resp = await async_client.get("/")
+    html = resp.text
+    assert "cards-grid" in html
+
+
+@pytest.mark.asyncio
+async def test_listing_card_elements(async_client):
+    """Each listing card has photo, price, market price, category and diff badges."""
+    resp = await async_client.get("/")
+    html = resp.text
+    assert "listing-card" in html
+    # Card photo area
+    assert "card-photo" in html
+    # Card body with price info
+    assert "card-price" in html
+    assert "card-market" in html
+    # Category and diff badges reused from table
+    assert "category-badge" in html
+    assert "diff-badge" in html
+
+
+@pytest.mark.asyncio
+async def test_card_shows_listing_data(async_client):
+    """Cards display actual listing data (brand, price)."""
+    resp = await async_client.get("/")
+    html = resp.text
+    # Toyota Camry is in sample data
+    assert "Toyota" in html
+    assert "Camry" in html
+    # Price formatted with spaces: 1 500 000
+    assert "1 500 000" in html
+
+
+@pytest.mark.asyncio
+async def test_cards_grid_in_htmx_partial(async_client):
+    """HTMX partial response includes both table and cards grid."""
+    resp = await async_client.get("/", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.text
+    assert "cards-grid" in html
+    assert "listings-table" in html
+
+
+@pytest.mark.asyncio
+async def test_card_photo_rendered(async_client):
+    """Card shows photo for listings that have photos."""
+    resp = await async_client.get("/")
+    html = resp.text
+    # Toyota Camry has photos in conftest
+    assert "card-photo" in html
+    assert "example.com/photo1.jpg" in html
+
+
+@pytest.mark.asyncio
+async def test_card_empty_state(async_client_empty):
+    """Empty state message appears when no listings for cards view."""
+    resp = await async_client_empty.get("/")
+    assert resp.status_code == 200
+    assert "Объявления не найдены" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_view_toggle_localstorage_script(async_client):
+    """Page includes JavaScript for localStorage view preference."""
+    resp = await async_client.get("/")
+    html = resp.text
+    assert "localStorage" in html
+    assert "viewPreference" in html

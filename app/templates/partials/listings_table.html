@@ -76,10 +76,10 @@
             </td>
             <td>
                 {% if listing.analysis %}
-                <div class="scoring-bar">
-                    <div class="scoring-fill" style="width: {{ (listing.analysis.confidence * 100) | int }}%"></div>
-                    <span class="scoring-text">{{ "%.0f" | format(listing.analysis.confidence * 100) }}%</span>
-                </div>
+                {% set conf_pct = (listing.analysis.confidence * 100) | int %}
+                <span class="score-value {% if conf_pct >= 80 %}score-high{% elif conf_pct >= 50 %}score-mid{% else %}score-low{% endif %}">
+                    {{ conf_pct }}%
+                </span>
                 {% else %}
                 <span class="muted">&mdash;</span>
                 {% endif %}

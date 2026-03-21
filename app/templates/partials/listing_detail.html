@@ -41,6 +41,15 @@
                 </span>
             </div>
             {% endif %}
+            {% if listing.market_price and listing.price %}
+            {% set diff_rub = listing.price - listing.market_price %}
+            <div class="info-item">
+                <span class="info-label">Разница</span>
+                <span class="info-value price-diff-abs {% if diff_rub < 0 %}diff-good{% elif diff_rub > 0 %}diff-bad{% else %}diff-neutral{% endif %}">
+                    {{ "{:,.0f}".format(diff_rub).replace(",", " ") }} &#8381;
+                </span>
+            </div>
+            {% endif %}
             {% if listing.mileage %}
             <div class="info-item">
                 <span class="info-label">Пробег</span>
@@ -66,11 +75,11 @@
         {% if listing.analysis.flags %}
         <div class="flags">
             <h4>Предупреждения</h4>
-            <ul>
+            <div class="flag-tags">
                 {% for flag in listing.analysis.flags %}
-                <li>{{ flag }}</li>
+                <span class="flag-tag">{{ flag }}</span>
                 {% endfor %}
-            </ul>
+            </div>
         </div>
         {% endif %}
     </div>

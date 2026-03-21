@@ -166,10 +166,7 @@ def _build_listings(rng: random.Random) -> list[Listing]:
 
         price = int(market_price * (1 + diff_pct / 100))
         description = rng.choice(_DESCRIPTIONS)
-        photos = [
-            f"https://img.example.com/cars/{source}/{i + 1}/photo_{j}.jpg"
-            for j in range(1, rng.randint(3, 8))
-        ]
+        photos = [f"https://img.example.com/cars/{source}/{i + 1}/photo_{j}.jpg" for j in range(1, rng.randint(3, 8))]
 
         listing = Listing(
             id=uuid.uuid5(uuid.NAMESPACE_DNS, f"{SEED_MARKER}-{i}"),
@@ -237,17 +234,11 @@ async def generate_seed_data(session: AsyncSession) -> int:
     before inserting.
     """
     # Delete existing seed data (analyses cascade via FK)
-    existing = await session.execute(
-        select(Listing.id).where(Listing.external_id.like("seed-%"))
-    )
+    existing = await session.execute(select(Listing.id).where(Listing.external_id.like("seed-%")))
     existing_ids = [row[0] for row in existing.all()]
     if existing_ids:
-        await session.execute(
-            delete(ListingAnalysis).where(ListingAnalysis.listing_id.in_(existing_ids))
-        )
-        await session.execute(
-            delete(Listing).where(Listing.id.in_(existing_ids))
-        )
+        await session.execute(delete(ListingAnalysis).where(ListingAnalysis.listing_id.in_(existing_ids)))
+        await session.execute(delete(Listing).where(Listing.id.in_(existing_ids)))
         await session.flush()
 
     # Use a fixed seed for reproducibility

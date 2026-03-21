@@ -44,16 +44,12 @@ class TestSeedSources:
     """Listings include both avito and autoru sources."""
 
     async def test_has_avito_source(self, seeded_session: AsyncSession):
-        result = await seeded_session.execute(
-            select(func.count(Listing.id)).where(Listing.source == "avito")
-        )
+        result = await seeded_session.execute(select(func.count(Listing.id)).where(Listing.source == "avito"))
         count = result.scalar()
         assert count > 0, "No listings with source='avito'"
 
     async def test_has_autoru_source(self, seeded_session: AsyncSession):
-        result = await seeded_session.execute(
-            select(func.count(Listing.id)).where(Listing.source == "autoru")
-        )
+        result = await seeded_session.execute(select(func.count(Listing.id)).where(Listing.source == "autoru"))
         count = result.scalar()
         assert count > 0, "No listings with source='autoru'"
 
@@ -62,9 +58,7 @@ class TestSeedDuplicates:
     """Some listings are marked as duplicates."""
 
     async def test_has_duplicates(self, seeded_session: AsyncSession):
-        result = await seeded_session.execute(
-            select(func.count(Listing.id)).where(Listing.is_duplicate.is_(True))
-        )
+        result = await seeded_session.execute(select(func.count(Listing.id)).where(Listing.is_duplicate.is_(True)))
         count = result.scalar()
         assert count > 0, "No duplicate listings found"
 
@@ -73,9 +67,7 @@ class TestSeedPriceDiff:
     """Some listings have negative price_diff_pct (below market)."""
 
     async def test_has_negative_price_diff(self, seeded_session: AsyncSession):
-        result = await seeded_session.execute(
-            select(func.count(Listing.id)).where(Listing.price_diff_pct < 0)
-        )
+        result = await seeded_session.execute(select(func.count(Listing.id)).where(Listing.price_diff_pct < 0))
         count = result.scalar()
         assert count > 0, "No listings with negative price_diff_pct"
 
@@ -85,22 +77,14 @@ class TestSeedAnalysis:
 
     async def test_every_listing_has_analysis(self, seeded_session: AsyncSession):
         listing_count = (await seeded_session.execute(select(func.count(Listing.id)))).scalar()
-        analysis_count = (
-            await seeded_session.execute(select(func.count(ListingAnalysis.id)))
-        ).scalar()
-        assert analysis_count == listing_count, (
-            f"Listing count ({listing_count}) != analysis count ({analysis_count})"
-        )
+        analysis_count = (await seeded_session.execute(select(func.count(ListingAnalysis.id)))).scalar()
+        assert analysis_count == listing_count, f"Listing count ({listing_count}) != analysis count ({analysis_count})"
 
     async def test_all_categories_represented(self, seeded_session: AsyncSession):
-        result = await seeded_session.execute(
-            select(ListingAnalysis.category).distinct()
-        )
+        result = await seeded_session.execute(select(ListingAnalysis.category).distinct())
         categories = {row[0] for row in result.all()}
         expected = {c.value for c in AnalysisCategory}
-        assert expected.issubset(categories), (
-            f"Missing categories: {expected - categories}"
-        )
+        assert expected.issubset(categories), f"Missing categories: {expected - categories}"
 
 
 class TestSeedIdempotent:
@@ -125,17 +109,13 @@ class TestSeedDataQuality:
 
     async def test_listings_have_descriptions(self, seeded_session: AsyncSession):
         result = await seeded_session.execute(
-            select(func.count(Listing.id)).where(
-                (Listing.description.is_(None)) | (Listing.description == "")
-            )
+            select(func.count(Listing.id)).where((Listing.description.is_(None)) | (Listing.description == ""))
         )
         empty_count = result.scalar()
         assert empty_count == 0, f"{empty_count} listings have empty descriptions"
 
     async def test_listings_have_photos(self, seeded_session: AsyncSession):
-        result = await seeded_session.execute(
-            select(func.count(Listing.id)).where(Listing.photos.is_(None))
-        )
+        result = await seeded_session.execute(select(func.count(Listing.id)).where(Listing.photos.is_(None)))
         no_photos = result.scalar()
         assert no_photos == 0, f"{no_photos} listings have no photos"
 

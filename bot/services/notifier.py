@@ -9,7 +9,7 @@ from sqlalchemy import select
 from bot.config import settings
 from bot.db.models import Filter, NotificationLog, User
 from bot.db.session import async_session
-from bot.services.checker import DemoChecker, Listing, ListingChecker
+from bot.services.checker import DatabaseChecker, DemoChecker, Listing, ListingChecker
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ async def _notify_user(
 async def run_notifier(bot: Bot, checker: ListingChecker | None = None) -> None:
     """Long-running task: fetch listings → match filters → send messages."""
     if checker is None:
-        checker = DemoChecker()
+        checker = DatabaseChecker(settings.app_database_url) if settings.app_database_url else DemoChecker()
 
     while True:
         try:

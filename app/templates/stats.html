@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Статистика - Perekup Dashboard{% endblock %}
+{% block content %}
+<h2>Статистика</h2>
+
+<div class="stats-cards">
+    <div class="stats-card">
+        <div class="stats-card-value">{{ total }}</div>
+        <div class="stats-card-label">Всего объявлений</div>
+    </div>
+    <div class="stats-card">
+        <div class="stats-card-value">{{ total_unique }}</div>
+        <div class="stats-card-label">Уникальных</div>
+    </div>
+    <div class="stats-card">
+        <div class="stats-card-value">{{ "{:,.0f}".format(avg_price).replace(",", " ") }} ₽</div>
+        <div class="stats-card-label">Средняя цена</div>
+    </div>
+</div>
+
+<div class="stats-cards">
+    {% for source, count in by_source.items() %}
+    <div class="stats-card">
+        <div class="stats-card-value">{{ count }}</div>
+        <div class="stats-card-label">{{ source }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<h3>Категории AI</h3>
+<div class="stats-categories">
+    {% set total_cat = by_category.values() | sum %}
+    {% for cat, count in by_category.items() %}
+    <span class="cat-badge cat-{{ cat }}">
+        {{ category_labels.get(cat, cat) }}
+        <strong>{{ count }}</strong>
+        {% if total_cat > 0 %}({{ (count / total_cat * 100) | round(1) }}%){% endif %}
+    </span>
+    {% endfor %}
+    {% if not by_category %}
+    <p>Нет данных по категориям</p>
+    {% endif %}
+</div>
+
+<h3>Топ марок</h3>
+{% if top_brands %}
+<table class="stats-table">
+    <thead>
+        <tr>
+            <th>Марка</th>
+            <th>Кол-во</th>
+            <th>Средняя цена</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for brand in top_brands %}
+        <tr>
+            <td>{{ brand.brand }}</td>
+            <td>{{ brand.count }}</td>
+            <td>{{ "{:,.0f}".format(brand.avg_price).replace(",", " ") }} ₽</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Нет данных</p>
+{% endif %}
+
+{% endblock %}

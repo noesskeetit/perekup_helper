@@ -345,8 +345,83 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 }
 .back-link:hover { text-decoration: underline; }
 
+/* Header nav */
+.header-nav {
+    display: inline-flex;
+    gap: 16px;
+    margin-left: 24px;
+    font-size: 0.9rem;
+}
+.header-nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-weight: 500;
+}
+.header-nav a:hover { color: var(--primary); }
+
+/* Stats page */
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.stats-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+.stats-card-value { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+.stats-card-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+
+.stats-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+.cat-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.cat-badge.cat-clean { background: var(--good-bg); color: var(--good); border: 1px solid var(--good-border); }
+.cat-badge.cat-damaged_body { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-border); }
+.cat-badge.cat-bad_docs { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-border); }
+.cat-badge.cat-debtor { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-border); }
+.cat-badge.cat-complex_but_profitable { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+.stats-table th {
+    background: #f9fafb;
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--border);
+}
+.stats-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
 @media (max-width: 768px) {
     .filters-grid { grid-template-columns: 1fr 1fr; }
     .detail-photos { grid-template-columns: 1fr 1fr; }
     .info-grid { grid-template-columns: 1fr 1fr; }
+    .stats-cards { grid-template-columns: 1fr 1fr; }
 }

@@ -81,3 +81,31 @@ class StatsResponse(BaseModel):
     avg_score: float | None = None
     by_category: dict[str, int] = {}
     by_brand: dict[str, int] = {}
+
+
+class StatsSummaryResponse(BaseModel):
+    total_listings: int
+    total_unique: int
+    by_source: dict[str, int] = {}
+    by_category: dict[str, int] = {}
+    avg_price: float | None = None
+    median_price: float | None = None
+    avg_discount: float | None = None
+    listings_today: int = 0
+    listings_this_week: int = 0
+
+
+class BrandStatsItem(BaseModel):
+    brand: str
+    count: int
+    avg_price: float | None = None
+    avg_discount: float | None = None
+
+
+class PriceBucket(BaseModel):
+    range: str
+    count: int
+
+
+class PriceDistributionResponse(BaseModel):
+    buckets: list[PriceBucket] = []

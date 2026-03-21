@@ -129,6 +129,7 @@ def sample_listings():
     return [
         SyncListing(
             id=1,
+            source="avito",
             brand="Toyota",
             model="Camry",
             year=2020,
@@ -147,6 +148,7 @@ def sample_listings():
         ),
         SyncListing(
             id=2,
+            source="avito",
             brand="Toyota",
             model="RAV4",
             year=2021,
@@ -165,6 +167,7 @@ def sample_listings():
         ),
         SyncListing(
             id=3,
+            source="autoru",
             brand="BMW",
             model="X5",
             year=2019,
@@ -183,6 +186,7 @@ def sample_listings():
         ),
         SyncListing(
             id=4,
+            source="autoru",
             brand="Kia",
             model="K5",
             year=2022,
@@ -201,6 +205,7 @@ def sample_listings():
         ),
         SyncListing(
             id=5,
+            source="avito",
             brand="Hyundai",
             model="Tucson",
             year=2018,

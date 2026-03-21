@@ -66,11 +66,7 @@ class DatabaseChecker:
         min_discount: float | None = None,
     ) -> Sequence[Listing]:
         async with self._session_factory() as session:
-            stmt = (
-                select(AppListing)
-                .where(AppListing.is_duplicate.is_(False))
-                .options(joinedload(AppListing.analysis))
-            )
+            stmt = select(AppListing).where(AppListing.is_duplicate.is_(False)).options(joinedload(AppListing.analysis))
 
             if self._last_check is not None:
                 stmt = stmt.where(AppListing.created_at > self._last_check)

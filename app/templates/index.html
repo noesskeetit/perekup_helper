@@ -1,82 +1,120 @@
 {% extends "base.html" %}
 {% block title %}Объявления - Perekup Dashboard{% endblock %}
 {% block content %}
-<div class="filters-panel" id="filters-panel">
-    <form hx-get="/" hx-target="#listings-content" hx-push-url="true">
-        <div class="filters-grid">
-            <div class="filter-group">
-                <label for="brand">Марка</label>
-                <input type="text" name="brand" id="brand" list="brand-list" value="{{ filters.brand }}" placeholder="Все марки">
-                <datalist id="brand-list">
-                    {% for b in brands %}
-                    <option value="{{ b }}">
-                    {% endfor %}
-                </datalist>
-            </div>
-            <div class="filter-group">
-                <label for="car_model">Модель</label>
-                <input type="text" name="car_model" id="car_model" value="{{ filters.car_model }}" placeholder="Все модели">
-            </div>
-            <div class="filter-group">
-                <label>Год</label>
-                <div class="range-inputs">
-                    <input type="number" name="year_from" value="{{ filters.year_from }}" placeholder="от" min="1990" max="2030">
-                    <input type="number" name="year_to" value="{{ filters.year_to }}" placeholder="до" min="1990" max="2030">
+<div class="dashboard-layout">
+    <div class="dashboard-filters">
+        <div class="filters-panel" id="filters-panel">
+            <form id="filters-form" hx-get="/" hx-target="#listings-content" hx-push-url="true" onsubmit="saveFilters()">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label for="brand">Марка</label>
+                        <input type="text" name="brand" id="brand" list="brand-list" value="{{ filters.brand }}" placeholder="Все марки">
+                        <datalist id="brand-list">
+                            {% for b in brands %}
+                            <option value="{{ b }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="filter-group">
+                        <label for="car_model">Модель</label>
+                        <input type="text" name="car_model" id="car_model" value="{{ filters.car_model }}" placeholder="Все модели">
+                    </div>
+                    <div class="filter-group">
+                        <label>Год</label>
+                        <div class="range-inputs">
+                            <input type="number" name="year_from" id="year_from" value="{{ filters.year_from }}" placeholder="от" min="1990" max="2030">
+                            <input type="number" name="year_to" id="year_to" value="{{ filters.year_to }}" placeholder="до" min="1990" max="2030">
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Цена</label>
+                        <div class="range-inputs">
+                            <input type="number" name="price_from" id="price_from" value="{{ filters.price_from }}" placeholder="от">
+                            <input type="number" name="price_to" id="price_to" value="{{ filters.price_to }}" placeholder="до">
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Отклонение %</label>
+                        <div class="range-inputs">
+                            <input type="number" name="diff_from" id="diff_from" value="{{ filters.diff_from }}" placeholder="от" step="0.1">
+                            <input type="number" name="diff_to" id="diff_to" value="{{ filters.diff_to }}" placeholder="до" step="0.1">
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label for="market_diff_pct_min">Ниже рынка на <span id="mdp-val">{{ filters.market_diff_pct_min if filters.market_diff_pct_min != "" else 0 }}</span>%+</label>
+                        <input type="range" id="market_diff_pct_min" name="market_diff_pct_min"
+                               min="0" max="50" step="1"
+                               value="{{ filters.market_diff_pct_min if filters.market_diff_pct_min != "" else 0 }}"
+                               oninput="document.getElementById('mdp-val').textContent=this.value">
+                    </div>
+                    <div class="filter-group">
+                        <label for="category">Категория</label>
+                        <select name="category" id="category">
+                            <option value="">Все</option>
+                            {% for key, label in categories.items() %}
+                            <option value="{{ key }}" {% if filters.category == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="hide_duplicates">Дубликаты</label>
+                        <select name="hide_duplicates" id="hide_duplicates">
+                            <option value="true" {% if filters.hide_duplicates %}selected{% endif %}>Скрыть дубли</option>
+                            <option value="false" {% if not filters.hide_duplicates %}selected{% endif %}>Показать дубли</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="filter-group">
-                <label>Цена</label>
-                <div class="range-inputs">
-                    <input type="number" name="price_from" value="{{ filters.price_from }}" placeholder="от">
-                    <input type="number" name="price_to" value="{{ filters.price_to }}" placeholder="до">
+                <div class="filters-actions">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                    <a href="/" class="btn btn-secondary" onclick="clearFilters()">Сбросить</a>
                 </div>
+                <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                <input type="hidden" name="sort_dir" value="{{ sort_dir }}">
+            </form>
+        </div>
+    </div>
+
+    <div class="dashboard-main">
+        <div class="results-summary">
+            Найдено: <strong>{{ total }}</strong> объявлений
+        </div>
+
+        <div id="listings-content">
+            {% include "partials/listings_table.html" %}
+        </div>
+    </div>
+
+    <div class="dashboard-sidebar">
+        <div class="sidebar-stats-grid">
+            <div class="sidebar-stat">
+                <div class="sidebar-stat-value">{{ total }}</div>
+                <div class="sidebar-stat-label">Всего</div>
             </div>
-            <div class="filter-group">
-                <label>Отклонение %</label>
-                <div class="range-inputs">
-                    <input type="number" name="diff_from" value="{{ filters.diff_from }}" placeholder="от" step="0.1">
-                    <input type="number" name="diff_to" value="{{ filters.diff_to }}" placeholder="до" step="0.1">
-                </div>
+            <div class="sidebar-stat">
+                <div class="sidebar-stat-value">{{ "{:,.0f}".format(avg_price).replace(",", " ") }} &#8381;</div>
+                <div class="sidebar-stat-label">Средняя цена</div>
             </div>
-            <div class="filter-group">
-                <label for="market_diff_pct_min">Ниже рынка на <span id="mdp-val">{{ filters.market_diff_pct_min if filters.market_diff_pct_min != "" else 0 }}</span>%+</label>
-                <input type="range" id="market_diff_pct_min" name="market_diff_pct_min"
-                       min="0" max="50" step="1"
-                       value="{{ filters.market_diff_pct_min if filters.market_diff_pct_min != "" else 0 }}"
-                       oninput="document.getElementById('mdp-val').textContent=this.value">
-            </div>
-            <div class="filter-group">
-                <label for="category">Категория</label>
-                <select name="category" id="category">
-                    <option value="">Все</option>
-                    {% for key, label in categories.items() %}
-                    <option value="{{ key }}" {% if filters.category == key %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <label for="hide_duplicates">Дубликаты</label>
-                <select name="hide_duplicates" id="hide_duplicates">
-                    <option value="true" {% if filters.hide_duplicates %}selected{% endif %}>Скрыть дубли</option>
-                    <option value="false" {% if not filters.hide_duplicates %}selected{% endif %}>Показать дубли</option>
-                </select>
+            <div class="sidebar-stat">
+                <div class="sidebar-stat-value">{{ avg_discount }}%</div>
+                <div class="sidebar-stat-label">Средняя скидка</div>
             </div>
         </div>
-        <div class="filters-actions">
-            <button type="submit" class="btn btn-primary">Применить</button>
-            <a href="/" class="btn btn-secondary">Сбросить</a>
+        <div class="sidebar-categories">
+            <h4>Категории</h4>
+            {% set total_cat = by_category.values() | sum %}
+            {% for cat, count in by_category.items() %}
+            <div class="sidebar-cat-item">
+                <span class="category-badge cat-{{ cat }}">
+                    {{ categories.get(cat, cat) }}
+                </span>
+                <span class="sidebar-cat-count">{{ count }}{% if total_cat > 0 %} ({{ (count / total_cat * 100) | round(1) }}%){% endif %}</span>
+            </div>
+            {% endfor %}
+            {% if not by_category %}
+            <p class="muted">Нет данных</p>
+            {% endif %}
         </div>
-        <input type="hidden" name="sort_by" value="{{ sort_by }}">
-        <input type="hidden" name="sort_dir" value="{{ sort_dir }}">
-    </form>
-</div>
-
-<div class="results-summary">
-    Найдено: <strong>{{ total }}</strong> объявлений
-</div>
-
-<div id="listings-content">
-    {% include "partials/listings_table.html" %}
+    </div>
 </div>
 
 <div id="detail-modal" class="modal" style="display:none">
@@ -85,6 +123,44 @@
 </div>
 
 <script>
+var FILTER_FIELDS = ['brand', 'car_model', 'year_from', 'year_to', 'price_from', 'price_to', 'diff_from', 'diff_to', 'market_diff_pct_min', 'category', 'hide_duplicates'];
+var STORAGE_KEY = 'perekup_filters';
+
+function saveFilters() {
+    var data = {};
+    FILTER_FIELDS.forEach(function(name) {
+        var el = document.getElementById(name);
+        if (el) data[name] = el.value;
+    });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+function restoreFilters() {
+    try {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+        var data = JSON.parse(saved);
+        var hasUrlParams = window.location.search.length > 1;
+        if (hasUrlParams) return;
+        FILTER_FIELDS.forEach(function(name) {
+            if (data[name] !== undefined && data[name] !== '') {
+                var el = document.getElementById(name);
+                if (el) {
+                    el.value = data[name];
+                    if (name === 'market_diff_pct_min') {
+                        var label = document.getElementById('mdp-val');
+                        if (label) label.textContent = data[name];
+                    }
+                }
+            }
+        });
+    } catch(e) {}
+}
+
+function clearFilters() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+}
+
 function openDetail(id) {
     htmx.ajax('GET', '/listings/' + id, {target: '#modal-body', swap: 'innerHTML'}).then(function() {
         document.getElementById('detail-modal').style.display = 'flex';
@@ -96,5 +172,6 @@ function closeModal() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeModal();
 });
+document.addEventListener('DOMContentLoaded', restoreFilters);
 </script>
 {% endblock %}

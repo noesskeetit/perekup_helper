@@ -2,7 +2,11 @@
 {% block title %}Объявления - Perekup Dashboard{% endblock %}
 {% block content %}
 <div class="filters-panel" id="filters-panel">
-    <form hx-get="/" hx-target="#listings-content" hx-push-url="true">
+    <button class="filters-toggle" id="filters-toggle" type="button" aria-expanded="false">
+        <span>Фильтры</span>
+        <span class="filters-toggle-icon">&#9660;</span>
+    </button>
+    <form hx-get="/" hx-target="#listings-content" hx-push-url="true" class="filters-form" id="filters-form">
         <div class="filters-grid">
             <div class="filter-group">
                 <label for="brand">Марка</label>
@@ -96,5 +100,15 @@ function closeModal() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeModal();
 });
+
+(function() {
+    var toggle = document.getElementById('filters-toggle');
+    var form = document.getElementById('filters-form');
+    toggle.addEventListener('click', function() {
+        var open = form.classList.toggle('filters-form-open');
+        toggle.classList.toggle('filters-toggle-open', open);
+        toggle.setAttribute('aria-expanded', open);
+    });
+})();
 </script>
 {% endblock %}

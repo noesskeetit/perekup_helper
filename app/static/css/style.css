@@ -419,9 +419,84 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     border-bottom: 1px solid var(--border);
 }
 
+/* Dashboard layout */
+.dashboard-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    grid-template-areas:
+        "filters filters"
+        "main sidebar";
+    gap: 20px;
+}
+.dashboard-filters { grid-area: filters; }
+.dashboard-main { grid-area: main; min-width: 0; }
+.dashboard-sidebar { grid-area: sidebar; }
+
+/* Sidebar stats */
+.sidebar-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.sidebar-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+.sidebar-stat-value { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+.sidebar-stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-categories {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+}
+.sidebar-categories h4 {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+.sidebar-cat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+}
+.sidebar-cat-count { font-size: 0.85rem; color: var(--text-muted); }
+
+/* Responsive: tablet */
+@media (max-width: 1200px) {
+    .dashboard-layout {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "filters"
+            "sidebar"
+            "main";
+    }
+    .sidebar-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Responsive: mobile */
 @media (max-width: 768px) {
     .filters-grid { grid-template-columns: 1fr 1fr; }
     .detail-photos { grid-template-columns: 1fr 1fr; }
     .info-grid { grid-template-columns: 1fr 1fr; }
     .stats-cards { grid-template-columns: 1fr 1fr; }
+    .sidebar-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .dashboard-layout {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "filters"
+            "sidebar"
+            "main";
+    }
 }

@@ -100,6 +100,20 @@ async def listings_page(
     brands_result = await session.execute(select(Listing.brand).distinct().order_by(Listing.brand))
     brands = [r[0] for r in brands_result.all()]
 
+    # Sidebar stats
+    avg_price_result = await session.execute(select(func.avg(Listing.price)))
+    avg_price = avg_price_result.scalar()
+
+    avg_discount_result = await session.execute(
+        select(func.avg(Listing.price_diff_pct)).where(Listing.price_diff_pct.isnot(None))
+    )
+    avg_discount = avg_discount_result.scalar()
+
+    cat_result = await session.execute(
+        select(ListingAnalysis.category, func.count(ListingAnalysis.id)).group_by(ListingAnalysis.category)
+    )
+    by_category = {row[0]: row[1] for row in cat_result.all()}
+
     ctx = {
         "request": request,
         "listings": listings,
@@ -123,6 +137,9 @@ async def listings_page(
         "page": page,
         "total_pages": total_pages,
         "total": total,
+        "avg_price": round(float(avg_price), 0) if avg_price else 0,
+        "avg_discount": round(float(avg_discount), 1) if avg_discount else 0,
+        "by_category": by_category,
     }
 
     if request.headers.get("HX-Request"):

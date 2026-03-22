@@ -4,7 +4,11 @@
 <div class="dashboard-layout">
     <div class="dashboard-filters">
         <div class="filters-panel" id="filters-panel">
-            <form id="filters-form" hx-get="/" hx-target="#listings-content" hx-push-url="true" onsubmit="saveFilters()">
+            <button class="filters-toggle" id="filters-toggle" type="button" aria-expanded="false">
+                <span>Фильтры</span>
+                <span class="filters-toggle-icon">&#9660;</span>
+            </button>
+            <form id="filters-form" hx-get="/" hx-target="#listings-content" hx-push-url="true" onsubmit="saveFilters()" class="filters-form">
                 <div class="filters-grid">
                     <div class="filter-group">
                         <label for="brand">Марка</label>
@@ -173,5 +177,15 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeModal();
 });
 document.addEventListener('DOMContentLoaded', restoreFilters);
+
+(function() {
+    var toggle = document.getElementById('filters-toggle');
+    var form = document.getElementById('filters-form');
+    toggle.addEventListener('click', function() {
+        var open = form.classList.toggle('filters-form-open');
+        toggle.classList.toggle('filters-toggle-open', open);
+        toggle.setAttribute('aria-expanded', open);
+    });
+})();
 </script>
 {% endblock %}

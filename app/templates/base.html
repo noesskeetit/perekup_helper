@@ -9,15 +9,31 @@
 </head>
 <body>
     <header>
-        <div class="container">
+        <div class="container header-container">
             <h1><a href="/">Perekup Dashboard</a></h1>
-            <nav class="header-nav">
+            <button class="burger-btn" id="burger-btn" aria-label="Меню" aria-expanded="false">
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+            </button>
+            <nav class="header-nav" id="header-nav">
                 <a href="/">Объявления</a>
                 <a href="/stats">Статистика</a>
             </nav>
             <span class="subtitle">AI-анализ авто-объявлений</span>
         </div>
     </header>
+    <script>
+    (function() {
+        var btn = document.getElementById('burger-btn');
+        var nav = document.getElementById('header-nav');
+        btn.addEventListener('click', function() {
+            var open = nav.classList.toggle('nav-open');
+            btn.classList.toggle('burger-open', open);
+            btn.setAttribute('aria-expanded', open);
+        });
+    })();
+    </script>
     <main class="container">
         {% block content %}{% endblock %}
     </main>

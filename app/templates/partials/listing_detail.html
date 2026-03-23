@@ -13,78 +13,107 @@
         {% endif %}
     </div>
 
+    {# ── Photo gallery ── #}
     {% if listing.photos and listing.photos | length > 0 %}
-    <div class="detail-photos">
-        {% for photo in listing.photos[:6] %}
-        <img src="{{ photo }}" alt="Фото {{ loop.index }}" loading="lazy">
-        {% endfor %}
+    <div class="gallery">
+        <div class="gallery-main">
+            <img src="{{ listing.photos[0] }}" alt="Фото 1" id="gallery-main-img" loading="lazy" onclick="openLightbox(0)">
+        </div>
+        {% if listing.photos | length > 1 %}
+        <div class="gallery-thumbs">
+            {% for photo in listing.photos %}
+            <img src="{{ photo }}"
+                 alt="Фото {{ loop.index }}"
+                 class="gallery-thumb{% if loop.index0 == 0 %} gallery-thumb-active{% endif %}"
+                 loading="lazy"
+                 onclick="selectPhoto({{ loop.index0 }})"
+                 data-index="{{ loop.index0 }}">
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
-    <div class="detail-info">
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Цена</span>
-                <span class="info-value price">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</span>
+    {# ── Price block ── #}
+    <div class="price-block">
+        <div class="price-main-row">
+            <div class="price-current">
+                <span class="price-label">Цена</span>
+                <span class="price-amount">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</span>
             </div>
             {% if listing.market_price %}
-            <div class="info-item">
-                <span class="info-label">Рыночная цена</span>
-                <span class="info-value">{{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;</span>
+            <div class="price-market">
+                <span class="price-label">Рыночная</span>
+                <span class="price-market-amount">{{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;</span>
             </div>
             {% endif %}
-            {% if listing.price_diff_pct is not none %}
-            <div class="info-item">
-                <span class="info-label">Отклонение</span>
-                <span class="info-value diff-badge {% if listing.price_diff_pct < -10 %}diff-good{% elif listing.price_diff_pct > 5 %}diff-bad{% else %}diff-neutral{% endif %}">
-                    {{ "%.1f" | format(listing.price_diff_pct) }}%
-                </span>
-            </div>
-            {% endif %}
-            {% if listing.market_price and listing.price %}
-            {% set diff_rub = listing.price - listing.market_price %}
-            <div class="info-item">
-                <span class="info-label">Разница</span>
-                <span class="info-value price-diff-abs {% if diff_rub < 0 %}diff-good{% elif diff_rub > 0 %}diff-bad{% else %}diff-neutral{% endif %}">
-                    {{ "{:,.0f}".format(diff_rub).replace(",", " ") }} &#8381;
-                </span>
-            </div>
-            {% endif %}
-            {% if listing.mileage %}
-            <div class="info-item">
-                <span class="info-label">Пробег</span>
-                <span class="info-value">{{ "{:,.0f}".format(listing.mileage).replace(",", " ") }} км</span>
-            </div>
-            {% endif %}
-            <div class="info-item">
-                <span class="info-label">Источник</span>
-                <span class="info-value">{{ listing.source }}</span>
-            </div>
         </div>
+        {% if listing.market_price and listing.price %}
+        {% set diff_rub = listing.price - listing.market_price %}
+        {% set diff_class = "diff-good" if diff_rub < 0 else ("diff-bad" if diff_rub > 0 else "diff-neutral") %}
+        <div class="price-diff-row">
+            <span class="price-diff-pill {{ diff_class }}">
+                {{ "{:,.0f}".format(diff_rub).replace(",", " ") }} &#8381;
+            </span>
+            {% if listing.price_diff_pct is not none %}
+            <span class="price-diff-pill {{ diff_class }}">
+                {{ "%.1f" | format(listing.price_diff_pct) }}%
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if listing.mileage %}
+        <div class="price-meta">
+            <span>Пробег: <strong>{{ "{:,.0f}".format(listing.mileage).replace(",", " ") }} км</strong></span>
+            <span>Источник: <strong>{{ listing.source }}</strong></span>
+        </div>
+        {% else %}
+        <div class="price-meta">
+            <span>Источник: <strong>{{ listing.source }}</strong></span>
+        </div>
+        {% endif %}
     </div>
 
+    {# ── AI verdict ── #}
     {% if listing.analysis %}
-    <div class="ai-analysis">
-        <h3>AI-Анализ</h3>
+    <div class="ai-verdict">
+        <h3>AI-Вердикт</h3>
+        <div class="verdict-top">
+            <div class="verdict-category">
+                <span class="category-badge cat-{{ listing.analysis.category }}">
+                    {{ categories.get(listing.analysis.category, listing.analysis.category) }}
+                </span>
+                {% set conf = (listing.analysis.confidence * 100) | round(0) | int %}
+                {% if listing.analysis.category == "clean" and conf >= 70 %}
+                <span class="recommendation-badge rec-buy">Покупать</span>
+                {% elif listing.analysis.category == "complex_but_profitable" or (listing.analysis.category == "clean" and conf < 70) %}
+                <span class="recommendation-badge rec-caution">Внимание</span>
+                {% else %}
+                <span class="recommendation-badge rec-skip">Пропустить</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="confidence-row">
+            <span class="confidence-label">Уверенность: {{ conf }}%</span>
+            <div class="confidence-bar">
+                <div class="confidence-fill{% if conf >= 80 %} conf-high{% elif conf >= 50 %} conf-mid{% else %} conf-low{% endif %}"
+                     style="width: {{ conf }}%"></div>
+            </div>
+        </div>
         {% if listing.analysis.ai_summary %}
         <p class="ai-summary">{{ listing.analysis.ai_summary }}</p>
         {% endif %}
-        <div class="analysis-meta">
-            <span>Уверенность: <strong>{{ "%.0f" | format(listing.analysis.confidence * 100) }}%</strong></span>
-        </div>
         {% if listing.analysis.flags %}
-        <div class="flags">
-            <h4>Предупреждения</h4>
-            <div class="flag-tags">
-                {% for flag in listing.analysis.flags %}
-                <span class="flag-tag">{{ flag }}</span>
-                {% endfor %}
-            </div>
+        <div class="verdict-flags">
+            {% for flag in listing.analysis.flags %}
+            <span class="flag-tag">{{ flag }}</span>
+            {% endfor %}
         </div>
         {% endif %}
     </div>
     {% endif %}
 
+    {# ── Description ── #}
     {% if listing.description %}
     <div class="detail-description">
         <h3>Описание</h3>
@@ -92,6 +121,7 @@
     </div>
     {% endif %}
 
+    {# ── Duplicates ── #}
     {% if duplicate_listings %}
     <div class="duplicate-section">
         <h3>{% if listing.is_duplicate %}Оригинал и другие источники{% else %}Объявление встречается на других площадках{% endif %}</h3>
@@ -108,7 +138,82 @@
     </div>
     {% endif %}
 
-    <div class="detail-actions">
-        <a href="{{ listing.url }}" target="_blank" rel="noopener" class="btn btn-primary">Открыть оригинал &rarr;</a>
+    {# ── Action buttons ── #}
+    <div class="detail-actions-bar">
+        <a href="{{ listing.url }}" target="_blank" rel="noopener" class="btn btn-primary">Открыть оригинал</a>
+        <a href="tel:" class="btn btn-secondary btn-call">Позвонить</a>
+        <a href="https://t.me/share/url?url={{ listing.url | urlencode }}&text={{ (listing.brand ~ ' ' ~ listing.model ~ ' ' ~ listing.year | string ~ ' — ' ~ '{:,.0f}'.format(listing.price).replace(',', ' ') ~ ' ₽') | urlencode }}"
+           target="_blank" rel="noopener" class="btn btn-secondary btn-tg">Telegram</a>
     </div>
 </div>
+
+{# ── Lightbox overlay ── #}
+{% if listing.photos and listing.photos | length > 0 %}
+<div id="lightbox" class="lightbox" style="display:none" onclick="closeLightboxOnBg(event)">
+    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+    {% if listing.photos | length > 1 %}
+    <button class="lightbox-prev" onclick="lightboxPrev()">&#8249;</button>
+    <button class="lightbox-next" onclick="lightboxNext()">&#8250;</button>
+    {% endif %}
+    <img id="lightbox-img" src="" alt="Lightbox">
+    <div class="lightbox-counter" id="lightbox-counter"></div>
+</div>
+<script>
+(function() {
+    var photos = {{ listing.photos | tojson }};
+    var currentIdx = 0;
+
+    window.selectPhoto = function(idx) {
+        currentIdx = idx;
+        var main = document.getElementById('gallery-main-img');
+        if (main) main.src = photos[idx];
+        var thumbs = document.querySelectorAll('.gallery-thumb');
+        thumbs.forEach(function(t, i) {
+            t.classList.toggle('gallery-thumb-active', i === idx);
+        });
+    };
+
+    window.openLightbox = function(idx) {
+        currentIdx = idx;
+        var lb = document.getElementById('lightbox');
+        var img = document.getElementById('lightbox-img');
+        img.src = photos[idx];
+        updateCounter();
+        lb.style.display = 'flex';
+        document.addEventListener('keydown', lbKey);
+    };
+
+    window.closeLightbox = function() {
+        document.getElementById('lightbox').style.display = 'none';
+        document.removeEventListener('keydown', lbKey);
+    };
+
+    window.closeLightboxOnBg = function(e) {
+        if (e.target.id === 'lightbox') closeLightbox();
+    };
+
+    window.lightboxPrev = function() {
+        currentIdx = (currentIdx - 1 + photos.length) % photos.length;
+        document.getElementById('lightbox-img').src = photos[currentIdx];
+        updateCounter();
+    };
+
+    window.lightboxNext = function() {
+        currentIdx = (currentIdx + 1) % photos.length;
+        document.getElementById('lightbox-img').src = photos[currentIdx];
+        updateCounter();
+    };
+
+    function updateCounter() {
+        var c = document.getElementById('lightbox-counter');
+        if (c) c.textContent = (currentIdx + 1) + ' / ' + photos.length;
+    }
+
+    function lbKey(e) {
+        if (e.key === 'ArrowLeft') lightboxPrev();
+        else if (e.key === 'ArrowRight') lightboxNext();
+        else if (e.key === 'Escape') closeLightbox();
+    }
+})();
+</script>
+{% endif %}

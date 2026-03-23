@@ -1,26 +1,36 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Perekup Dashboard{% endblock %}</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+    (function() {
+        var saved = null;
+        try { saved = localStorage.getItem('perekup_theme'); } catch(e) {}
+        if (saved === 'dark' || (saved === null && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    })();
+    </script>
 </head>
 <body>
     <header>
         <div class="container header-container">
             <h1><a href="/">Perekup Dashboard</a></h1>
-            <button class="burger-btn" id="burger-btn" aria-label="Меню" aria-expanded="false">
-                <span class="burger-line"></span>
-                <span class="burger-line"></span>
-                <span class="burger-line"></span>
-            </button>
             <nav class="header-nav" id="header-nav">
                 <a href="/">Объявления</a>
                 <a href="/stats">Статистика</a>
             </nav>
             <span class="subtitle">AI-анализ авто-объявлений</span>
+            <button class="theme-toggle" id="theme-toggle" aria-label="Переключить тему" title="Переключить тему"></button>
+            <button class="burger-btn" id="burger-btn" aria-label="Меню" aria-expanded="false">
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+            </button>
         </div>
     </header>
     <script>
@@ -31,6 +41,30 @@
             var open = nav.classList.toggle('nav-open');
             btn.classList.toggle('burger-open', open);
             btn.setAttribute('aria-expanded', open);
+        });
+
+        var toggle = document.getElementById('theme-toggle');
+        function isDark() {
+            return document.documentElement.getAttribute('data-theme') === 'dark';
+        }
+        function updateIcon() {
+            toggle.textContent = isDark() ? '\u2600\uFE0F' : '\uD83C\uDF19';
+        }
+        updateIcon();
+        toggle.addEventListener('click', function() {
+            var dark = !isDark();
+            document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
+            try { localStorage.setItem('perekup_theme', dark ? 'dark' : 'light'); } catch(e) {}
+            updateIcon();
+        });
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            var saved = null;
+            try { saved = localStorage.getItem('perekup_theme'); } catch(ex) {}
+            if (saved === null) {
+                document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : '');
+                updateIcon();
+            }
         });
     })();
     </script>

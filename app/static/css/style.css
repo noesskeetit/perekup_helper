@@ -15,6 +15,51 @@
     --bad: #dc2626;
     --bad-bg: #fef2f2;
     --bad-border: #fecaca;
+    --table-header-bg: #f9fafb;
+    --row-hover: #f0f4ff;
+    --row-good-hover: #dcfce7;
+    --row-complex-hover: #fef9c3;
+    --row-bad-hover: #fee2e2;
+    --ai-bg: #f0f4ff;
+    --ai-border: #dbeafe;
+    --duplicate-bg: #eff6ff;
+    --duplicate-color: #1d4ed8;
+    --duplicate-border: #bfdbfe;
+    --desc-text: #444;
+    --shadow-modal: rgba(0, 0, 0, 0.3);
+    --backdrop: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] {
+    --bg: #111113;
+    --surface: #1c1c1e;
+    --border: #333;
+    --text: #e5e5e7;
+    --text-muted: #999;
+    --primary: #5b9aff;
+    --primary-hover: #4a87e8;
+    --good: #4ade80;
+    --good-bg: #14271a;
+    --good-border: #1a4028;
+    --warning: #facc15;
+    --warning-bg: #27220a;
+    --warning-border: #3d3510;
+    --bad: #f87171;
+    --bad-bg: #2a1215;
+    --bad-border: #451a1e;
+    --table-header-bg: #232325;
+    --row-hover: #1e2433;
+    --row-good-hover: #1a3322;
+    --row-complex-hover: #33300f;
+    --row-bad-hover: #35181b;
+    --ai-bg: #1a2035;
+    --ai-border: #253050;
+    --duplicate-bg: #1a2035;
+    --duplicate-color: #5b9aff;
+    --duplicate-border: #253050;
+    --desc-text: #bbb;
+    --shadow-modal: rgba(0, 0, 0, 0.6);
+    --backdrop: rgba(0, 0, 0, 0.7);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -98,7 +143,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     overflow: hidden;
 }
 .listings-table th {
-    background: #f9fafb;
+    background: var(--table-header-bg);
     padding: 10px 12px;
     text-align: left;
     font-size: 0.8rem;
@@ -118,15 +163,15 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     vertical-align: middle;
 }
 .listing-row { cursor: pointer; transition: background 0.15s; }
-.listing-row:hover { background: #f0f4ff; }
+.listing-row:hover { background: var(--row-hover); }
 
 /* Row color indication */
 .row-good { background: var(--good-bg); }
-.row-good:hover { background: #dcfce7; }
+.row-good:hover { background: var(--row-good-hover); }
 .row-complex { background: var(--warning-bg); }
-.row-complex:hover { background: #fef9c3; }
+.row-complex:hover { background: var(--row-complex-hover); }
 .row-bad { background: var(--bad-bg); }
-.row-bad:hover { background: #fee2e2; }
+.row-bad:hover { background: var(--row-bad-hover); }
 
 /* Photo */
 .photo-cell { width: 72px; }
@@ -151,7 +196,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 }
 .diff-good { background: var(--good-bg); color: var(--good); border: 1px solid var(--good-border); }
 .diff-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
-.diff-neutral { background: #f9fafb; color: var(--text-muted); border: 1px solid var(--border); }
+.diff-neutral { background: var(--table-header-bg); color: var(--text-muted); border: 1px solid var(--border); }
 .diff-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-border); }
 
 /* Category badge */
@@ -176,9 +221,9 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     border-radius: 10px;
     font-size: 0.75rem;
     font-weight: 600;
-    background: #eff6ff;
-    color: #1d4ed8;
-    border: 1px solid #bfdbfe;
+    background: var(--duplicate-bg);
+    color: var(--duplicate-color);
+    border: 1px solid var(--duplicate-border);
     margin-left: 4px;
 }
 .canonical-badge {
@@ -241,7 +286,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 .modal-backdrop {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--backdrop);
 }
 .modal-content {
     position: relative;
@@ -252,7 +297,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     max-height: 90vh;
     overflow-y: auto;
     z-index: 1001;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 60px var(--shadow-modal);
 }
 
 /* Detail card */
@@ -303,8 +348,8 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 .info-item .info-value { font-size: 1.1rem; font-weight: 600; }
 
 .ai-analysis {
-    background: #f0f4ff;
-    border: 1px solid #dbeafe;
+    background: var(--ai-bg);
+    border: 1px solid var(--ai-border);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 20px;
@@ -332,7 +377,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 
 .detail-description { margin-bottom: 20px; }
 .detail-description h3 { font-size: 1rem; margin-bottom: 8px; }
-.detail-description p { color: #444; line-height: 1.6; }
+.detail-description p { color: var(--desc-text); line-height: 1.6; }
 
 .detail-actions { margin-top: 16px; }
 .detail-page { max-width: 800px; }
@@ -362,7 +407,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     border: none;
     cursor: pointer;
     padding: 8px;
-    margin-left: auto;
+    margin-left: 8px;
     min-width: 44px;
     min-height: 44px;
 }
@@ -391,6 +436,28 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     font-weight: 500;
 }
 .header-nav a:hover { color: var(--primary); }
+
+/* Theme toggle */
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 6px 10px;
+    margin-left: auto;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--text);
+    transition: border-color 0.2s;
+}
+.theme-toggle:hover { border-color: var(--primary); }
+
+/* Form inputs dark mode */
+.filter-group input,
+.filter-group select {
+    background: var(--surface);
+    color: var(--text);
+}
 
 /* Filters accordion toggle (hidden on desktop) */
 .filters-toggle {
@@ -458,7 +525,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     margin-bottom: 24px;
 }
 .stats-table th {
-    background: #f9fafb;
+    background: var(--table-header-bg);
     padding: 10px 16px;
     text-align: left;
     font-size: 0.8rem;

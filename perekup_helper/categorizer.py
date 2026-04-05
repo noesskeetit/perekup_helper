@@ -1,11 +1,12 @@
-"""AI-категоризация авто-объявлений через Claude API."""
+"""AI-категоризация авто-объявлений через OpenRouter API."""
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 
-import anthropic
+import httpx
 
 from perekup_helper.models import (
     CATEGORY_BASE_SCORES,
@@ -16,6 +17,8 @@ from perekup_helper.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SYSTEM_PROMPT = """\
 Ты — эксперт-перекупщик автомобилей. Анализируй описания объявлений о продаже авто \
@@ -66,38 +69,49 @@ USER_PROMPT_TEMPLATE = """\
 
 
 class Categorizer:
-    """AI-категоризатор авто-объявлений через Claude API."""
+    """AI-категоризатор авто-объявлений через OpenRouter API."""
 
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = "qwen/qwen3.6-plus:free",
         max_tokens: int = 512,
     ) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key)
+        self._api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
         self._model = model
         self._max_tokens = max_tokens
 
     def categorize(self, listing: ListingDescription) -> CategoryResult:
         """Категоризировать одно объявление."""
-        message = self._client.messages.create(
-            model=self._model,
-            max_tokens=self._max_tokens,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": USER_PROMPT_TEMPLATE.format(text=listing.text),
-                }
-            ],
-        )
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": USER_PROMPT_TEMPLATE.format(text=listing.text)},
+        ]
 
-        raw_text = message.content[0].text  # type: ignore[union-attr]
+        raw_text = self._call_openrouter(messages)
         return self._parse_response(raw_text)
 
-    def categorize_and_score(self, listing: ListingDescription) -> ScoreResult:
+    def categorize_with_image(self, listing: ListingDescription, image_url: str) -> CategoryResult:
+        """Категоризировать объявление с фотографией (мультимодальность)."""
+        content = [
+            {"type": "text", "text": USER_PROMPT_TEMPLATE.format(text=listing.text)},
+            {"type": "image_url", "image_url": {"url": image_url}},
+        ]
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": content},
+        ]
+
+        raw_text = self._call_openrouter(messages)
+        return self._parse_response(raw_text)
+
+    def categorize_and_score(self, listing: ListingDescription, image_url: str | None = None) -> ScoreResult:
         """Категоризировать объявление и посчитать скоринг привлекательности."""
-        category_result = self.categorize(listing)
+        if image_url:
+            category_result = self.categorize_with_image(listing, image_url)
+        else:
+            category_result = self.categorize(listing)
+
         price_ratio = _compute_price_ratio(listing.price, listing.market_price)
         score = _compute_attractiveness(category_result, price_ratio)
 
@@ -108,9 +122,42 @@ class Categorizer:
             attractiveness_score=score,
         )
 
+    def _call_openrouter(self, messages: list[dict], max_retries: int = 3) -> str:
+        """Call OpenRouter API with retry on rate limits."""
+        import time
+
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self._model,
+            "messages": messages,
+            "max_tokens": self._max_tokens,
+            "temperature": 0.1,
+        }
+
+        for attempt in range(1, max_retries + 1):
+            response = httpx.post(
+                OPENROUTER_URL,
+                json=payload,
+                headers=headers,
+                timeout=60,
+            )
+            if response.status_code == 429:
+                wait = min(attempt * 10, 30)
+                logger.warning("OpenRouter rate limit, waiting %ds (attempt %d/%d)", wait, attempt, max_retries)
+                time.sleep(wait)
+                continue
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+        raise RuntimeError("OpenRouter rate limit exceeded after retries")
+
     @staticmethod
     def _parse_response(raw: str) -> CategoryResult:
-        """Парсинг JSON-ответа от Claude."""
+        """Парсинг JSON-ответа."""
         cleaned = raw.strip()
         # Убираем возможные markdown-обёртки
         if cleaned.startswith("```"):
@@ -118,13 +165,18 @@ class Categorizer:
             lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
 
+        # Иногда модель оборачивает в ```json ... ```
+        if "```json" in cleaned:
+            start = cleaned.index("```json") + 7
+            end = cleaned.index("```", start) if "```" in cleaned[start:] else len(cleaned)
+            cleaned = cleaned[start:end].strip()
+
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError as exc:
-            logger.error("Не удалось распарсить ответ Claude: %s", raw[:200])
-            raise ValueError(f"Невалидный JSON от Claude: {exc}") from exc
+            logger.error("Не удалось распарсить ответ: %s", raw[:200])
+            raise ValueError(f"Невалидный JSON: {exc}") from exc
 
-        # Валидация категории
         try:
             category = CarCategory(data["category"])
         except (KeyError, ValueError) as exc:
@@ -146,24 +198,16 @@ def _compute_price_ratio(price: int | None, market_price: int | None) -> float |
 
 
 def _compute_attractiveness(result: CategoryResult, price_ratio: float | None) -> float:
-    """Скоринг привлекательности (0..10).
-
-    Формула: base_category_score * 5 + price_discount_bonus * 5
-    - base_category_score: вес категории (0..1)
-    - price_discount_bonus: чем ниже цена от рынка, тем выше бонус (0..1)
-    """
+    """Скоринг привлекательности (0..10)."""
     base = CATEGORY_BASE_SCORES.get(result.category, 0.5)
     category_component = base * 5.0
 
     if price_ratio is not None and price_ratio > 0:
-        # price_ratio < 1.0 → скидка; 0.5 = -50% от рынка → максимальный бонус
         discount = max(0.0, 1.0 - price_ratio)
         price_component = min(discount * 2.0, 1.0) * 5.0
     else:
-        price_component = 2.5  # нет данных о цене — нейтральный балл
+        price_component = 2.5
 
-    # Бонус за уверенность модели
     confidence_factor = 0.7 + 0.3 * result.confidence
-
     score = (category_component + price_component) * confidence_factor
     return round(min(max(score, 0.0), 10.0), 1)

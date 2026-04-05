@@ -139,6 +139,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 
 .model-name { color: var(--text-muted); font-size: 0.9rem; }
 .price { font-weight: 600; white-space: nowrap; }
+.mileage { font-size: 0.85rem; white-space: nowrap; color: var(--text); }
 .muted { color: var(--text-muted); }
 
 /* Diff badge */
@@ -345,8 +346,69 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 }
 .back-link:hover { text-decoration: underline; }
 
+/* Stats bar */
+.stats-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.stat-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 20px;
+    text-align: center;
+    flex: 1;
+    min-width: 120px;
+}
+.stat-value { display: block; font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.stat-label { display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+.stat-hot { color: var(--bad); font-weight: 700; }
+.stat-model .stat-label { color: var(--primary); }
+
+/* Score badge */
+.score-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    min-width: 36px;
+    text-align: center;
+}
+.score-hot { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.score-good { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.score-mid { background: #fefce8; color: #ca8a04; border: 1px solid #fef08a; }
+.score-low { background: #f9fafb; color: #9ca3af; border: 1px solid #e5e7eb; }
+
+/* Hot deal diff badge */
+.diff-hot { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700; }
+.diff-ok { background: #f0fdf4; color: #22c55e; border: 1px solid #bbf7d0; }
+
+/* Hot deal row */
+.row-hot-deal { background: #fff1f2; }
+.row-hot-deal:hover { background: #ffe4e6; }
+
+/* Source link */
+.source-link {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--primary);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+}
+.source-link:hover { background: #dbeafe; }
+
 @media (max-width: 768px) {
     .filters-grid { grid-template-columns: 1fr 1fr; }
     .detail-photos { grid-template-columns: 1fr 1fr; }
     .info-grid { grid-template-columns: 1fr 1fr; }
+    .stats-bar { gap: 8px; }
+    .stat-item { padding: 8px 12px; }
+    .stat-value { font-size: 1.2rem; }
 }

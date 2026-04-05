@@ -1,0 +1,97 @@
+[avito]
+tg_token = ""
+tg_chat_id = []
+vk_token = ""
+vk_user_id = []
+urls = [
+    # Москва — крупнейший рынок
+    "https://www.avito.ru/moskva/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/kia?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/bmw?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/nissan?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/volkswagen?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/ford?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/renault?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/mazda?cd=1&s=104",
+    # Краснодар
+    "https://www.avito.ru/krasnodar/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/krasnodar/avtomobili/vaz_lada?cd=1&s=104",
+    "https://www.avito.ru/krasnodar/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/krasnodar/avtomobili/kia?cd=1&s=104",
+    # СПб
+    "https://www.avito.ru/sankt-peterburg/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/kia?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/volkswagen?cd=1&s=104",
+    # Самара
+    "https://www.avito.ru/samara/avtomobili/vaz_lada?cd=1&s=104",
+    "https://www.avito.ru/samara/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/samara/avtomobili/hyundai?cd=1&s=104",
+    # Екатеринбург
+    "https://www.avito.ru/ekaterinburg/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/ekaterinburg/avtomobili/vaz_lada?cd=1&s=104",
+    "https://www.avito.ru/ekaterinburg/avtomobili/kia?cd=1&s=104",
+    # Казань
+    "https://www.avito.ru/kazan/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/kazan/avtomobili/vaz_lada?cd=1&s=104",
+    "https://www.avito.ru/kazan/avtomobili/hyundai?cd=1&s=104",
+    # Нижний Новгород
+    "https://www.avito.ru/nizhniy_novgorod/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/nizhniy_novgorod/avtomobili/vaz_lada?cd=1&s=104",
+    # Новосибирск
+    "https://www.avito.ru/novosibirsk/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/novosibirsk/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/novosibirsk/avtomobili/kia?cd=1&s=104",
+    # Ростов
+    "https://www.avito.ru/rostov-na-donu/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/rostov-na-donu/avtomobili/vaz_lada?cd=1&s=104",
+    "https://www.avito.ru/rostov-na-donu/avtomobili/kia?cd=1&s=104",
+    # Воронеж
+    "https://www.avito.ru/voronezh/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/voronezh/avtomobili/vaz_lada?cd=1&s=104",
+    # Волгоград
+    "https://www.avito.ru/volgograd/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/volgograd/avtomobili/hyundai?cd=1&s=104",
+    # Челябинск
+    "https://www.avito.ru/chelyabinsk/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/chelyabinsk/avtomobili/kia?cd=1&s=104",
+]
+count = 10
+keys_word_white_list = []
+keys_word_black_list = [
+    "без ПТС",
+    "после ДТП",
+    "не на ходу",
+    "в залоге",
+    "требует вложений",
+    "звонить понимающим",
+    "на запчасти",
+    "под разбор",
+    "не заводится",
+    "кривой кузов",
+    "нерастаможен",
+    "утеряны документы",
+]
+seller_black_list = []
+max_price = 3000000
+min_price = 100000
+geo = ""
+proxy_string = "alex:alex@bproxy.site:14518"
+proxy_change_url = "https://changeip.mobileproxy.space/?proxy_key=abf2e5dc61e827256c21191a59a6fe3a"
+pause_general = 300
+pause_between_links = 3
+max_age = 0
+max_count_of_retry = 5
+ignore_reserv = true
+ignore_promotion = false
+one_time_start = true
+one_file_for_link = false
+parse_views = false
+save_xlsx = false
+use_webdriver = false
+use_bypass_api = true
+cookies_api_key = "sk_live_6ooaCqlDWP58m_sTKlMt1Bvv7LmKXP7I2e7OAxD9fIc"
+use_own_cookies = false
+parse_phone = false
+proxy_notifier = ""

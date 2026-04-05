@@ -13,3 +13,7 @@ data/
 venv/
 .pytest_cache/
 .mypy_cache/
+logs/
+storage/
+catboost_info/
+models/

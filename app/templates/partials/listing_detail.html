@@ -8,6 +8,11 @@
             {{ categories.get(listing.analysis.category, listing.analysis.category) }}
         </span>
         {% endif %}
+        {% if listing.analysis and listing.analysis.score is not none %}
+        <span class="score-badge {% if listing.analysis.score >= 7 %}score-hot{% elif listing.analysis.score >= 5 %}score-good{% elif listing.analysis.score >= 3 %}score-mid{% else %}score-low{% endif %}">
+            {{ "%.1f" | format(listing.analysis.score) }}
+        </span>
+        {% endif %}
         {% if listing.is_duplicate %}
         <span class="duplicate-badge">Дубликат</span>
         {% endif %}
@@ -29,15 +34,15 @@
             </div>
             {% if listing.market_price %}
             <div class="info-item">
-                <span class="info-label">Рыночная цена</span>
+                <span class="info-label">Рыночная (P50)</span>
                 <span class="info-value">{{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;</span>
             </div>
             {% endif %}
             {% if listing.price_diff_pct is not none %}
             <div class="info-item">
-                <span class="info-label">Отклонение</span>
-                <span class="info-value diff-badge {% if listing.price_diff_pct < -10 %}diff-good{% elif listing.price_diff_pct > 5 %}diff-bad{% else %}diff-neutral{% endif %}">
-                    {{ "%.1f" | format(listing.price_diff_pct) }}%
+                <span class="info-label">vs Рынок</span>
+                <span class="info-value diff-badge {% if listing.price_diff_pct|float > 15 %}diff-hot{% elif listing.price_diff_pct|float > 5 %}diff-good{% elif listing.price_diff_pct|float > 0 %}diff-ok{% elif listing.price_diff_pct|float > -10 %}diff-neutral{% else %}diff-bad{% endif %}">
+                    {% if listing.price_diff_pct|float > 0 %}&minus;{% elif listing.price_diff_pct|float < 0 %}+{% endif %}{{ "%.1f" | format(listing.price_diff_pct|float|abs) }}%
                 </span>
             </div>
             {% endif %}
@@ -56,9 +61,53 @@
                 <span class="info-value">{{ "{:,.0f}".format(listing.mileage).replace(",", " ") }} км</span>
             </div>
             {% endif %}
+            {% if listing.engine_type or listing.engine_volume %}
+            <div class="info-item">
+                <span class="info-label">Двигатель</span>
+                <span class="info-value">{{ listing.engine_volume or "" }}{% if listing.engine_volume %} л{% endif %} {{ listing.engine_type or "" }}{% if listing.power_hp %} / {{ listing.power_hp }} л.с.{% endif %}</span>
+            </div>
+            {% endif %}
+            {% if listing.transmission %}
+            <div class="info-item">
+                <span class="info-label">КПП</span>
+                <span class="info-value">{{ listing.transmission }}</span>
+            </div>
+            {% endif %}
+            {% if listing.drive_type %}
+            <div class="info-item">
+                <span class="info-label">Привод</span>
+                <span class="info-value">{{ listing.drive_type }}</span>
+            </div>
+            {% endif %}
+            {% if listing.body_type %}
+            <div class="info-item">
+                <span class="info-label">Кузов</span>
+                <span class="info-value">{{ listing.body_type }}</span>
+            </div>
+            {% endif %}
+            {% if listing.color %}
+            <div class="info-item">
+                <span class="info-label">Цвет</span>
+                <span class="info-value">{{ listing.color }}</span>
+            </div>
+            {% endif %}
+            {% if listing.owners_count %}
+            <div class="info-item">
+                <span class="info-label">Владельцев</span>
+                <span class="info-value">{{ listing.owners_count }}</span>
+            </div>
+            {% endif %}
+            {% if listing.vin %}
+            <div class="info-item">
+                <span class="info-label">VIN</span>
+                <span class="info-value">{{ listing.vin }}</span>
+            </div>
+            {% endif %}
             <div class="info-item">
                 <span class="info-label">Источник</span>
-                <span class="info-value">{{ listing.source }}</span>
+                <span class="info-value">
+                    <a href="{{ listing.url }}" target="_blank" rel="noopener" class="source-link">{{ listing.source }}</a>
+                </span>
             </div>
         </div>
     </div>
@@ -71,6 +120,9 @@
         {% endif %}
         <div class="analysis-meta">
             <span>Уверенность: <strong>{{ "%.0f" | format(listing.analysis.confidence * 100) }}%</strong></span>
+            {% if listing.analysis.score is not none %}
+            <span> | Привлекательность: <strong>{{ "%.1f" | format(listing.analysis.score) }}/10</strong></span>
+            {% endif %}
         </div>
         {% if listing.analysis.flags %}
         <div class="flags">
@@ -94,7 +146,7 @@
 
     {% if duplicate_listings %}
     <div class="duplicate-section">
-        <h3>{% if listing.is_duplicate %}Оригинал и другие источники{% else %}Объявление встречается на других площадках{% endif %}</h3>
+        <h3>{% if listing.is_duplicate %}Оригинал и другие источники{% else %}На других площадках{% endif %}</h3>
         <ul class="duplicate-list">
             {% for dup in duplicate_listings %}
             <li>

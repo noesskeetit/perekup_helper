@@ -1,4 +1,4 @@
-"""Batch processing для экономии API calls при категоризации объявлений."""
+"""Batch processing для категоризации объявлений через OpenRouter."""
 
 from __future__ import annotations
 
@@ -6,9 +6,10 @@ import json
 import logging
 import time
 
-import anthropic
+import httpx
 
 from perekup_helper.categorizer import (
+    OPENROUTER_URL,
     SYSTEM_PROMPT,
     Categorizer,
     _compute_attractiveness,
@@ -22,7 +23,6 @@ from perekup_helper.models import (
 
 logger = logging.getLogger(__name__)
 
-# Макс. объявлений в одном запросе к Claude (чтобы не превысить контекст)
 DEFAULT_BATCH_SIZE = 10
 
 BATCH_USER_PROMPT_TEMPLATE = """\
@@ -48,18 +48,18 @@ ID должны совпадать с переданными."""
 
 
 class BatchProcessor:
-    """Групповая обработка объявлений для экономии API-вызовов."""
+    """Групповая обработка объявлений через OpenRouter API."""
 
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = "qwen/qwen3.6-plus:free",
         batch_size: int = DEFAULT_BATCH_SIZE,
         max_tokens: int = 4096,
-        rate_limit_delay: float = 0.5,
+        rate_limit_delay: float = 1.0,
         max_retries: int = 2,
     ) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key)
+        self._api_key = api_key
         self._model = model
         self._batch_size = batch_size
         self._max_tokens = max_tokens
@@ -68,11 +68,7 @@ class BatchProcessor:
         self._single_categorizer = Categorizer(api_key=api_key, model=model)
 
     def process(self, listings: list[ListingDescription]) -> list[ScoreResult]:
-        """Обработать список объявлений батчами.
-
-        Группирует объявления по batch_size, отправляет по одному
-        запросу на группу. При ошибке в батче — fallback на поштучную обработку.
-        """
+        """Обработать список объявлений батчами."""
         results: list[ScoreResult] = []
 
         for i in range(0, len(listings), self._batch_size):
@@ -94,18 +90,18 @@ class BatchProcessor:
                     exc_info=True,
                 )
                 for listing in batch:
-                    results.append(self._process_single(listing))
+                    try:
+                        results.append(self._process_single(listing))
+                    except Exception:
+                        logger.warning("Не удалось категоризировать %s", listing.id, exc_info=True)
 
-            # Rate limiting между батчами
             if i + self._batch_size < len(listings):
                 time.sleep(self._rate_limit_delay)
 
         return results
 
     def _process_batch(self, batch: list[ListingDescription]) -> list[ScoreResult]:
-        """Обработать один батч объявлений одним API-вызовом."""
         listings_block = "\n\n".join(f"--- Объявление ID: {listing.id} ---\n{listing.text}" for listing in batch)
-
         prompt = BATCH_USER_PROMPT_TEMPLATE.format(count=len(batch), listings_block=listings_block)
 
         raw_text = self._call_api_with_retry(prompt)
@@ -133,50 +129,65 @@ class BatchProcessor:
         return results
 
     def _call_api_with_retry(self, user_prompt: str) -> str:
-        """Вызов Claude API с retry при ошибках."""
+        """Call OpenRouter API with retry."""
+        import os
+
+        api_key = self._api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
         last_exc: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
-                message = self._client.messages.create(
-                    model=self._model,
-                    max_tokens=self._max_tokens,
-                    system=SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": user_prompt}],
+                response = httpx.post(
+                    OPENROUTER_URL,
+                    json={
+                        "model": self._model,
+                        "messages": [
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "max_tokens": self._max_tokens,
+                        "temperature": 0.1,
+                    },
+                    headers=headers,
+                    timeout=90,
                 )
-                return message.content[0].text  # type: ignore[union-attr]
-            except anthropic.RateLimitError:
-                logger.warning(
-                    "Rate limit (попытка %d/%d), ждём...",
-                    attempt,
-                    self._max_retries,
-                )
-                time.sleep(self._rate_limit_delay * attempt * 2)
-                last_exc = None
-            except anthropic.APIError as exc:
-                logger.warning(
-                    "API ошибка (попытка %d/%d): %s",
-                    attempt,
-                    self._max_retries,
-                    exc,
-                )
-                last_exc = exc
-                if attempt < self._max_retries:
-                    time.sleep(self._rate_limit_delay * attempt)
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"]
 
-        raise RuntimeError(f"Не удалось вызвать Claude API за {self._max_retries} попыток") from last_exc
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 429:
+                    logger.warning("Rate limit (попытка %d/%d)", attempt, self._max_retries)
+                    time.sleep(self._rate_limit_delay * attempt * 3)
+                else:
+                    last_exc = exc
+                    logger.warning("API ошибка %d (попытка %d/%d)", exc.response.status_code, attempt, self._max_retries)
+                    time.sleep(self._rate_limit_delay * attempt)
+            except Exception as exc:
+                last_exc = exc
+                logger.warning("Ошибка запроса (попытка %d/%d): %s", attempt, self._max_retries, exc)
+                time.sleep(self._rate_limit_delay * attempt)
+
+        raise RuntimeError(f"Не удалось вызвать OpenRouter API за {self._max_retries} попыток") from last_exc
 
     def _process_single(self, listing: ListingDescription) -> ScoreResult:
-        """Fallback: поштучная обработка через Categorizer."""
         return self._single_categorizer.categorize_and_score(listing)
 
     @staticmethod
     def _parse_batch_response(raw: str) -> dict[str, CategoryResult]:
-        """Парсинг JSON-массива из batch-ответа Claude."""
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
             lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
+        if "```json" in cleaned:
+            start = cleaned.index("```json") + 7
+            end = cleaned.index("```", start) if "```" in cleaned[start:] else len(cleaned)
+            cleaned = cleaned[start:end].strip()
 
         try:
             data = json.loads(cleaned)

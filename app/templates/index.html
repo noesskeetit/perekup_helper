@@ -1,6 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Объявления - Perekup Dashboard{% endblock %}
+{% block title %}PerekupHelper — Объявления ниже рынка{% endblock %}
 {% block content %}
+
+{% if stats %}
+<div class="stats-bar">
+    <div class="stat-item">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Объявлений</span>
+    </div>
+    <div class="stat-item">
+        <span class="stat-value">{{ stats.below_market }}</span>
+        <span class="stat-label">Ниже рынка</span>
+    </div>
+    <div class="stat-item">
+        <span class="stat-value">{{ stats.hot_deals }}</span>
+        <span class="stat-label stat-hot">Горячие сделки</span>
+    </div>
+    {% if stats.avg_diff is not none %}
+    <div class="stat-item">
+        <span class="stat-value">{{ "%.1f" | format(stats.avg_diff) }}%</span>
+        <span class="stat-label">Ср. отклонение</span>
+    </div>
+    {% endif %}
+    {% if stats.model_info %}
+    <div class="stat-item stat-model">
+        <span class="stat-value">{{ stats.model_info.training_size }}</span>
+        <span class="stat-label">Модель обучена на</span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="dashboard-layout">
     <div class="dashboard-filters">
         <div class="filters-panel" id="filters-panel">
@@ -58,6 +88,24 @@
                             {% for key, label in categories.items() %}
                             <option value="{{ key }}" {% if filters.category == key %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="city">Город</label>
+                        <input type="text" name="city" id="city" list="city-list" value="{{ filters.city }}" placeholder="Все города">
+                        <datalist id="city-list">
+                            {% for c in cities %}
+                            <option value="{{ c }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="filter-group">
+                        <label for="source">Источник</label>
+                        <select name="source" id="source">
+                            <option value="">Все</option>
+                            <option value="avito" {% if filters.source == "avito" %}selected{% endif %}>Avito</option>
+                            <option value="drom" {% if filters.source == "drom" %}selected{% endif %}>Drom.ru</option>
+                            <option value="autoru" {% if filters.source == "autoru" %}selected{% endif %}>Auto.ru</option>
                         </select>
                     </div>
                     <div class="filter-group">
@@ -127,7 +175,7 @@
 </div>
 
 <script>
-var FILTER_FIELDS = ['brand', 'car_model', 'year_from', 'year_to', 'price_from', 'price_to', 'diff_from', 'diff_to', 'market_diff_pct_min', 'category', 'hide_duplicates'];
+var FILTER_FIELDS = ['brand', 'car_model', 'year_from', 'year_to', 'price_from', 'price_to', 'diff_from', 'diff_to', 'market_diff_pct_min', 'category', 'city', 'source', 'hide_duplicates'];
 var STORAGE_KEY = 'perekup_filters';
 
 function saveFilters() {

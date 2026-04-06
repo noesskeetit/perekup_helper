@@ -107,6 +107,13 @@ def enrich_listing_from_detail(listing: ParsedListing, html: str) -> ParsedListi
         if desc:
             listing.description = desc
 
+    # Avito price estimate (their internal market valuation)
+    avito_estimate = _extract_price_estimate(html)
+    if avito_estimate:
+        if listing.raw_data is None:
+            listing.raw_data = {}
+        listing.raw_data["avito_estimate"] = avito_estimate
+
     return listing
 
 
@@ -181,6 +188,30 @@ def _extract_description(html: str) -> str | None:
                 return text
         except (json.JSONDecodeError, UnicodeDecodeError):
             pass
+    return None
+
+
+def _extract_price_estimate(html: str) -> int | None:
+    """Extract Avito's internal price estimate from the detail page.
+
+    Avito shows "Оценка стоимости" — their market valuation.
+    It appears in JSON as priceEstimate/marketPrice/valuationPrice fields.
+    """
+    unescaped = html.replace('\\"', '"')
+
+    # Pattern 1: "marketPrice":{"value":NNN}
+    for pattern in [
+        r'"marketPrice"\s*:\s*\{"value"\s*:\s*(\d+)',
+        r'"priceEstimate"\s*:\s*(\d+)',
+        r'"valuationPrice"\s*:\s*(\d+)',
+        r'"marketValue"\s*:\s*(\d+)',
+        r'"estimatedPrice"\s*:\s*(\d+)',
+    ]:
+        m = re.search(pattern, unescaped)
+        if m:
+            val = int(m.group(1))
+            if 10_000 < val < 50_000_000:
+                return val
     return None
 
 

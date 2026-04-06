@@ -72,23 +72,36 @@ async def detect_and_mark_duplicates(session: AsyncSession) -> int:
 
 
 def _fuzzy_group(listings: list[Listing]) -> list[list[Listing]]:
-    """Group listings by brand/model/year + mileage/price tolerance (greedy)."""
-    groups: list[list[Listing]] = []
-    visited: set[uuid.UUID] = set()
+    """Group listings by brand/model/year bucket, then compare within each bucket.
 
-    for i, a in enumerate(listings):
-        if a.id in visited:
+    O(n) bucket creation + O(k²) within each small bucket ≈ O(n) overall,
+    vs. the previous O(n²) pairwise comparison across all listings.
+    """
+    # Bucket by (brand_lower, model_lower, year) — exact match required for these
+    buckets: dict[tuple[str, str, int], list[Listing]] = defaultdict(list)
+    for listing in listings:
+        key = (listing.brand.lower(), listing.model.lower(), listing.year)
+        buckets[key].append(listing)
+
+    groups: list[list[Listing]] = []
+    for bucket in buckets.values():
+        if len(bucket) < 2:
             continue
-        group = [a]
-        for b in listings[i + 1 :]:
-            if b.id in visited:
+        # Within each bucket, greedily group by mileage/price tolerance
+        visited: set[uuid.UUID] = set()
+        for i, a in enumerate(bucket):
+            if a.id in visited:
                 continue
-            if _is_fuzzy_match(a, b):
-                group.append(b)
-                visited.add(b.id)
-        if len(group) > 1:
-            visited.add(a.id)
-            groups.append(group)
+            group = [a]
+            for b in bucket[i + 1 :]:
+                if b.id in visited:
+                    continue
+                if _is_fuzzy_match(a, b):
+                    group.append(b)
+                    visited.add(b.id)
+            if len(group) > 1:
+                visited.add(a.id)
+                groups.append(group)
 
     return groups
 

@@ -84,6 +84,20 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
         result.source_results.append(pr)
         result.total_new += pr.new_saved
 
+    # Step 2.5: Deduplicate across sources
+    if result.total_new > 0:
+        try:
+            from app.db.session import async_session_factory
+            from app.services.deduplication import detect_and_mark_duplicates
+
+            async with async_session_factory() as session:
+                dupes = await detect_and_mark_duplicates(session)
+                if dupes:
+                    logger.info("Pipeline: marked %d duplicates", dupes)
+        except Exception as exc:
+            logger.exception("Pipeline: deduplication failed")
+            result.errors.append(f"dedup: {exc}")
+
     # Step 3: Score with price model
     if result.total_new > 0:
         try:

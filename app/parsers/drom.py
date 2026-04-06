@@ -167,7 +167,15 @@ class DromParser(BaseParser):
         card_urls: list[str] = []
 
         for page in range(1, self._pages + 1):
-            url = f"{base_url.rstrip('/')}page{page}/" if page > 1 else base_url
+            if page > 1:
+                # Insert page{n}/ before query string: .../toyota/page2/?minprice=...
+                if "?" in base_url:
+                    path, qs = base_url.split("?", 1)
+                    url = f"{path.rstrip('/')}/page{page}/?{qs}"
+                else:
+                    url = f"{base_url.rstrip('/')}/page{page}/"
+            else:
+                url = base_url
             try:
                 # Rotate UA per listing page request
                 headers = {"User-Agent": random.choice(USER_AGENTS)}

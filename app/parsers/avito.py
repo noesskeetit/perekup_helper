@@ -83,6 +83,13 @@ class AvitoParser(BaseParser):
         import sys
         from pathlib import Path
 
+        # Ensure .env is loaded so COOKIES_API_KEY etc. are available
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+
         # Add avipars to path so its imports work
         avipars_dir = Path(self._config_path).parent.resolve()
         if str(avipars_dir) not in sys.path:
@@ -172,33 +179,42 @@ class AvitoParser(BaseParser):
 
     @staticmethod
     def _get_known_external_ids(external_ids: list[str]) -> set[str]:
-        """Query the database for which external_ids already exist (sync-safe)."""
+        """Query the database for which external_ids already exist (sync-safe via asyncio)."""
         if not external_ids:
             return set()
         try:
-            from sqlalchemy import create_engine, text
+            from sqlalchemy import text
+            from sqlalchemy.ext.asyncio import create_async_engine
 
-            import app.config as cfg
-            db_url = getattr(cfg, "DATABASE_URL", None) or ""
-            if not db_url:
-                import os
-                db_url = os.environ.get("DATABASE_URL", "")
-            if not db_url:
-                return set()
+            from app.config import settings
 
-            # Convert async URL to sync if needed
-            sync_url = db_url.replace("+asyncpg", "").replace("+aiosqlite", "")
-            engine = create_engine(sync_url)
+            async def _query():
+                engine = create_async_engine(settings.database_url, pool_size=1)
+                try:
+                    async with engine.connect() as conn:
+                        placeholders = ", ".join(f":id{i}" for i in range(len(external_ids)))
+                        params = {f"id{i}": eid for i, eid in enumerate(external_ids)}
+                        result = await conn.execute(
+                            text(f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"),
+                            params,
+                        )
+                        return {row[0] for row in result}
+                finally:
+                    await engine.dispose()
 
-            with engine.connect() as conn:
-                # Use parameterized query with IN clause
-                placeholders = ", ".join(f":id{i}" for i in range(len(external_ids)))
-                params = {f"id{i}": eid for i, eid in enumerate(external_ids)}
-                result = conn.execute(
-                    text(f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"),
-                    params,
-                )
-                return {row[0] for row in result}
+            # Run async query from sync context (we're in a thread)
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                # We're inside an existing event loop (called from to_thread)
+                # Create a new loop in this thread
+                return asyncio.run(_query())
+            else:
+                return asyncio.run(_query())
         except Exception:
             logger.debug("Avito: could not check existing IDs, will enrich all", exc_info=True)
             return set()

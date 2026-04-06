@@ -106,22 +106,7 @@ class AutoruParser(BaseParser):
             session.proxies = {"http": proxy_url, "https": proxy_url}
             logger.info("Auto.ru: using proxy")
 
-        # Load pre-warmed cookies from Playwright
-        cookies_path = os.path.join("storage", "autoru_cookies.json")
-        if os.path.exists(cookies_path):
-            import json
-
-            with open(cookies_path, encoding="utf-8") as f:
-                saved_cookies = json.load(f)
-            session.cookies.update(saved_cookies)
-            logger.info("Auto.ru: loaded %d pre-warmed cookies", len(saved_cookies))
-        else:
-            logger.warning("Auto.ru: no pre-warmed cookies, trying cold start")
-            try:
-                session.get("https://auto.ru/", timeout=15)
-                time.sleep(2)
-            except Exception:
-                logger.debug("Auto.ru: failed to warm up session")
+        self._load_cookies(session, cffi_requests)
 
         captcha_count = 0
         for search in self._searches:
@@ -154,6 +139,22 @@ class AutoruParser(BaseParser):
                         logger.warning("Auto.ru: %s returned %d", url, resp.status_code)
                         break
 
+                    # Detect stale cookies: real pages are 500KB+, stubs are <50KB
+                    if len(resp.text) < 50_000 and "mark_info" not in resp.text:
+                        logger.warning("Auto.ru: page only %d bytes (stale cookies?), re-warming", len(resp.text))
+                        if self._warmup_cookies(session):
+                            # Retry this page with fresh cookies
+                            resp = session.get(url, timeout=60)
+                            if len(resp.text) < 50_000:
+                                logger.warning("Auto.ru: still blocked after warmup, skipping search")
+                                self._try_change_ip()
+                                time.sleep(5)
+                                break
+                        else:
+                            self._try_change_ip()
+                            time.sleep(5)
+                            break
+
                     page_listings = self._extract_offers(resp.text)
                     for listing in page_listings:
                         if listing.external_id not in seen_ids:
@@ -173,6 +174,43 @@ class AutoruParser(BaseParser):
 
         logger.info("AutoruParser fetched %d listings total (captchas hit: %d)", len(all_listings), captcha_count)
         return all_listings
+
+    @staticmethod
+    def _load_cookies(session, cffi_requests) -> None:
+        """Load pre-warmed cookies, or warmup if missing/stale."""
+        cookies_path = os.path.join("storage", "autoru_cookies.json")
+        if os.path.exists(cookies_path):
+            with open(cookies_path, encoding="utf-8") as f:
+                saved_cookies = json.load(f)
+            session.cookies.update(saved_cookies)
+            logger.info("Auto.ru: loaded %d pre-warmed cookies", len(saved_cookies))
+        else:
+            logger.warning("Auto.ru: no cookies, running inline warmup")
+            AutoruParser._warmup_cookies(session)
+
+    @staticmethod
+    def _warmup_cookies(session) -> bool:
+        """Inline cookie warmup: visit auto.ru main page + search page."""
+        try:
+            session.get("https://auto.ru/", timeout=20)
+            time.sleep(2)
+            resp = session.get(
+                "https://auto.ru/cars/toyota/used/?geo_id=213&price_from=100000&price_to=3000000",
+                timeout=120,
+            )
+            if len(resp.text) > 50_000 and "mark_info" in resp.text:
+                # Save refreshed cookies
+                cookies_dict = {c.name: c.value for c in session.cookies.jar}
+                cookies_path = os.path.join("storage", "autoru_cookies.json")
+                os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
+                with open(cookies_path, "w", encoding="utf-8") as f:
+                    json.dump(cookies_dict, f, indent=2)
+                logger.info("Auto.ru: inline warmup OK, saved %d cookies", len(cookies_dict))
+                return True
+            logger.warning("Auto.ru: inline warmup got %d bytes (no data)", len(resp.text))
+        except Exception:
+            logger.warning("Auto.ru: inline warmup failed", exc_info=True)
+        return False
 
     @staticmethod
     def _try_change_ip() -> None:

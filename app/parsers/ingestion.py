@@ -21,8 +21,8 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
     if not listings:
         return result
 
-    # Normalize all listings
-    listings = [normalize_listing(item) for item in listings]
+    # Normalize all listings (normalize_listing returns None for garbage data)
+    listings = [normed for item in listings if (normed := normalize_listing(item)) is not None]
 
     async with async_session_factory() as session:
         external_ids = [item.external_id for item in listings]

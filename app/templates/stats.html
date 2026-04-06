@@ -37,10 +37,11 @@
     </div>
 </div>
 
+<h3>По источникам</h3>
 <div class="stats-cards">
     {% for source, count in by_source.items() %}
     <div class="stats-card">
-        <div class="stats-card-value">{{ count }}</div>
+        <div class="stats-card-value">{{ count }} <small>({{ by_source_unique.get(source, 0) }} уник.)</small></div>
         <div class="stats-card-label">{{ source }}</div>
     </div>
     {% endfor %}
@@ -77,6 +78,30 @@
             <td>{{ brand.brand }}</td>
             <td>{{ brand.count }}</td>
             <td>{{ "{:,.0f}".format(brand.avg_price).replace(",", " ") }} ₽</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Нет данных</p>
+{% endif %}
+
+<h3>Топ городов</h3>
+{% if top_cities %}
+<table class="stats-table">
+    <thead>
+        <tr>
+            <th>Город</th>
+            <th>Кол-во</th>
+            <th>Средняя цена</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for city in top_cities %}
+        <tr>
+            <td>{{ city.city }}</td>
+            <td>{{ city.count }}</td>
+            <td>{{ "{:,.0f}".format(city.avg_price).replace(",", " ") }} ₽</td>
         </tr>
         {% endfor %}
     </tbody>

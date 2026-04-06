@@ -127,6 +127,76 @@ async def hot_deals(
     ]
 
 
+@app.get("/api/stats")
+async def api_stats():
+    """All key metrics in one JSON call — for bots and programmatic access."""
+    from sqlalchemy import case, func, select
+
+    from app.db.session import async_session_factory
+    from app.models.listing import Listing, ListingAnalysis
+    from app.services.pricing import get_price_model
+
+    async with async_session_factory() as session:
+        # ── Single aggregate query over listings ──
+        total_col = func.count(Listing.id)
+        unique_col = func.count(case((Listing.is_duplicate.is_(False), Listing.id)))
+        dupes_col = func.count(case((Listing.is_duplicate.is_(True), Listing.id)))
+        hot_col = func.count(
+            case(
+                (
+                    (Listing.is_duplicate.is_(False)) & (Listing.price_diff_pct > 15),
+                    Listing.id,
+                )
+            )
+        )
+        avg_price_col = func.avg(Listing.price)
+        avg_discount_col = func.avg(
+            case(
+                (Listing.price_diff_pct.isnot(None), Listing.price_diff_pct),
+            )
+        )
+
+        agg_stmt = select(
+            total_col,
+            unique_col,
+            dupes_col,
+            hot_col,
+            avg_price_col,
+            avg_discount_col,
+        )
+        agg_row = (await session.execute(agg_stmt)).one()
+        total_listings = agg_row[0] or 0
+        unique_listings = agg_row[1] or 0
+        duplicates = agg_row[2] or 0
+        hot_deals_count = agg_row[3] or 0
+        avg_price = round(float(agg_row[4]), 0) if agg_row[4] else 0
+        avg_discount = round(float(agg_row[5]), 2) if agg_row[5] else 0
+
+        # ── By-source breakdown ──
+        src_stmt = select(Listing.source, func.count(Listing.id)).group_by(Listing.source)
+        src_rows = (await session.execute(src_stmt)).all()
+        by_source = {row[0]: row[1] for row in src_rows}
+
+        # ── Analyzed count ──
+        analyzed_stmt = select(func.count(ListingAnalysis.id))
+        analyzed_count = (await session.execute(analyzed_stmt)).scalar() or 0
+
+    analyzed_pct = round(analyzed_count / unique_listings * 100, 1) if unique_listings else 0
+
+    return {
+        "total_listings": total_listings,
+        "unique_listings": unique_listings,
+        "duplicates": duplicates,
+        "by_source": by_source,
+        "analyzed_count": analyzed_count,
+        "analyzed_pct": analyzed_pct,
+        "hot_deals_count": hot_deals_count,
+        "avg_price": avg_price,
+        "avg_discount": avg_discount,
+        "model_info": get_price_model().get_info(),
+    }
+
+
 @app.get("/api/model-info")
 async def model_info():
     """Get current price model metadata."""

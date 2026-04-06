@@ -6,10 +6,13 @@ to consistent enum values. Maps source-specific raw fields to canonical forms.
 
 from __future__ import annotations
 
+import logging
 import re
 from enum import Enum
 
 from app.parsers.base import ParsedListing
+
+logger = logging.getLogger(__name__)
 
 # ── Canonical enums ──────────────────────────────────────────────────────────
 
@@ -343,14 +346,52 @@ def normalize_brand(brand: str | None) -> str | None:
     return stripped
 
 
-def normalize_listing(listing: ParsedListing) -> ParsedListing:
-    """Normalize all categorical fields in a ParsedListing to canonical values."""
+def normalize_listing(listing: ParsedListing) -> ParsedListing | None:
+    """Normalize all categorical fields in a ParsedListing to canonical values.
+
+    Returns ``None`` when the listing should be discarded (e.g. garbage price).
+    """
     listing.brand = normalize_brand(listing.brand) or listing.brand
     listing.transmission = _norm(listing.transmission, _TRANSMISSION_MAP)
     listing.drive_type = _norm(listing.drive_type, _DRIVE_MAP)
     listing.body_type = _norm(listing.body_type, _BODY_MAP)
     listing.engine_type = _norm(listing.engine_type, _ENGINE_MAP)
     listing.steering_wheel = _norm(listing.steering_wheel, _STEERING_MAP)
+
+    # ── Sanity checks ───────────────────────────────────────────────────────
+
+    # Mileage: discard obviously wrong values
+    if listing.mileage is not None and (listing.mileage < 0 or listing.mileage > 999_999):
+        logger.warning(
+            "Bad mileage %s for listing %s — resetting to None",
+            listing.mileage,
+            listing.external_id,
+        )
+        listing.mileage = None
+
+    # Price: skip listings with garbage price
+    if listing.price < 10_000 or listing.price > 50_000_000:
+        logger.warning(
+            "Skipping listing %s — price %s out of sane range",
+            listing.external_id,
+            listing.price,
+        )
+        return None
+
+    # Year: reset implausible values
+    if listing.year < 1970 or listing.year > 2027:
+        logger.warning(
+            "Bad year %s for listing %s — resetting to 0",
+            listing.year,
+            listing.external_id,
+        )
+        listing.year = 0
+
+    # Brand: warn if still empty after normalization
+    if not listing.brand:
+        logger.warning("Empty brand after normalization for listing %s", listing.external_id)
+
+    # ── Derived fields ──────────────────────────────────────────────────────
 
     # Derive photo_count
     listing.photo_count = len(listing.photos) if listing.photos else 0

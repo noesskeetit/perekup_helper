@@ -77,8 +77,9 @@ seller_black_list = []
 max_price = 3000000
 min_price = 100000
 geo = ""
-proxy_string = "alex:alex@bproxy.site:14518"
-proxy_change_url = "https://changeip.mobileproxy.space/?proxy_key=abf2e5dc61e827256c21191a59a6fe3a"
+# Real values in .env — DO NOT commit credentials
+proxy_string = ""  # Set PROXY_STRING in .env
+proxy_change_url = ""  # Set PROXY_CHANGE_URL in .env
 pause_general = 300
 pause_between_links = 3
 max_age = 0
@@ -91,7 +92,7 @@ parse_views = false
 save_xlsx = false
 use_webdriver = false
 use_bypass_api = true
-cookies_api_key = "sk_live_6ooaCqlDWP58m_sTKlMt1Bvv7LmKXP7I2e7OAxD9fIc"
+cookies_api_key = ""  # Set COOKIES_API_KEY in .env
 use_own_cookies = false
 parse_phone = false
 proxy_notifier = ""

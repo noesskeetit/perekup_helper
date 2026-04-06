@@ -1,0 +1,118 @@
+"""Unified parsing pipeline: fetch → ingest → score prices → analyze."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+
+from app.parsers.avito import AvitoParser
+from app.parsers.base import BaseParser, ParseResult
+from app.parsers.ingestion import ingest_listings
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PipelineResult:
+    """Aggregated result of a full pipeline run."""
+
+    source_results: list[ParseResult] = field(default_factory=list)
+    total_new: int = 0
+    total_scored: int = 0
+    total_analyzed: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
+def get_all_parsers() -> list[BaseParser]:
+    """Return all configured parsers."""
+    parsers: list[BaseParser] = [
+        AvitoParser(config_path="avipars/config.toml"),
+    ]
+
+    try:
+        from app.parsers.drom import DromParser
+
+        parsers.append(DromParser())
+    except ImportError:
+        pass
+
+    try:
+        from app.parsers.autoru import AutoruParser
+
+        parsers.append(AutoruParser())
+    except ImportError:
+        pass
+
+    return parsers
+
+
+async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResult:
+    """Execute the full pipeline:
+
+    1. Fetch listings from all sources
+    2. Ingest into PostgreSQL (dedup by source+external_id)
+    3. Score prices with CatBoost model (P10/P50/P90)
+    4. AI categorization of new listings
+    """
+    result = PipelineResult()
+
+    if parsers is None:
+        parsers = get_all_parsers()
+
+    # Step 1+2: Fetch and ingest from ALL sources IN PARALLEL
+    from app.parsers.proxy_manager import change_ip, check_proxy
+
+    # Health-check proxy before starting
+    check_proxy()
+
+    async def _fetch_and_ingest(parser: BaseParser) -> ParseResult:
+        source = parser.source_name
+        logger.info("Pipeline: fetching from %s", source)
+        try:
+            listings = await parser.fetch_listings()
+            logger.info("Pipeline: %s returned %d listings", source, len(listings))
+            return await ingest_listings(listings, source)
+        except Exception as exc:
+            logger.exception("Pipeline: %s failed, changing IP and skipping", source)
+            change_ip()
+            result.errors.append(f"{source}: {exc}")
+            return ParseResult(source=source, errors=1)
+
+    parse_results = await asyncio.gather(*[_fetch_and_ingest(p) for p in parsers])
+    for pr in parse_results:
+        result.source_results.append(pr)
+        result.total_new += pr.new_saved
+
+    # Step 3: Score with price model
+    if result.total_new > 0:
+        try:
+            from app.services.pricing_trainer import score_listings
+
+            scored = await score_listings(limit=result.total_new + 50)
+            result.total_scored = scored
+            logger.info("Pipeline: scored %d listings", scored)
+        except Exception as exc:
+            logger.exception("Pipeline: price scoring failed")
+            result.errors.append(f"pricing: {exc}")
+
+    # Step 4: AI categorization
+    if result.total_new > 0:
+        try:
+            from app.parsers.analyzer import analyze_new_listings
+
+            analyzed = await analyze_new_listings(limit=result.total_new + 10)
+            result.total_analyzed = analyzed
+            logger.info("Pipeline: analyzed %d listings", analyzed)
+        except Exception as exc:
+            logger.exception("Pipeline: analysis failed")
+            result.errors.append(f"analysis: {exc}")
+
+    logger.info(
+        "Pipeline complete: new=%d, scored=%d, analyzed=%d, errors=%d",
+        result.total_new,
+        result.total_scored,
+        result.total_analyzed,
+        len(result.errors),
+    )
+    return result

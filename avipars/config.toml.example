@@ -1,0 +1,58 @@
+[avito]
+tg_token = ""
+tg_chat_id = []
+vk_token = ""
+vk_user_id = []
+urls = [
+    # Москва
+    "https://www.avito.ru/moskva/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/kia?cd=1&s=104",
+    # Краснодар
+    "https://www.avito.ru/krasnodar/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/krasnodar/avtomobili/vaz_lada?cd=1&s=104",
+    # СПб
+    "https://www.avito.ru/sankt-peterburg/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/kia?cd=1&s=104",
+    # Самара (Поволжье)
+    "https://www.avito.ru/samara/avtomobili/vaz_lada?cd=1&s=104",
+    "https://www.avito.ru/samara/avtomobili/toyota?cd=1&s=104",
+]
+count = 3
+keys_word_white_list = []
+keys_word_black_list = [
+    "без ПТС",
+    "после ДТП",
+    "не на ходу",
+    "в залоге",
+    "требует вложений",
+    "звонить понимающим",
+    "на запчасти",
+    "под разбор",
+    "не заводится",
+    "кривой кузов",
+    "нерастаможен",
+    "утеряны документы",
+]
+seller_black_list = []
+max_price = 3000000
+min_price = 100000
+geo = ""
+proxy_string = ""
+proxy_change_url = ""
+pause_general = 300
+pause_between_links = 3
+max_age = 0
+max_count_of_retry = 5
+ignore_reserv = true
+ignore_promotion = false
+one_time_start = false
+one_file_for_link = false
+parse_views = false
+save_xlsx = true
+use_webdriver = false
+use_bypass_api = true
+cookies_api_key = "YOUR_SPFA_API_KEY_HERE"
+use_own_cookies = false
+parse_phone = false
+proxy_notifier = ""

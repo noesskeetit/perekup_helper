@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  parser_avito:
+    container_name: avito
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./cookies.json:/app/cookies.json
+      - ./result:/app/result
+      - ./database.db:/app/database.db
+
+    # ports:
+    #   - "8000:8000"
+
+    # environment:
+    #   - PYTHONUNBUFFERED=1

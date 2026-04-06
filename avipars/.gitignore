@@ -1,0 +1,10 @@
+# created by virtualenv automatically
+.secret.txt
+config.toml
+database.db
+storage/
+result/
+logs/
+debug_response.html
+__pycache__/
+*.pyc

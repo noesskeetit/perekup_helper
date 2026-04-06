@@ -43,40 +43,46 @@ HEADERS = {
 BULL_URL_RE = re.compile(r"https?://auto\.drom\.ru/\w+/\w+/\w+/(\d+)\.html")
 
 DEFAULT_URLS = [
-    # Moscow
-    "https://moscow.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://moscow.drom.ru/hyundai/?minprice=100000&maxprice=3000000",
-    "https://moscow.drom.ru/kia/?minprice=100000&maxprice=3000000",
-    "https://moscow.drom.ru/bmw/?minprice=100000&maxprice=3000000",
-    "https://moscow.drom.ru/nissan/?minprice=100000&maxprice=3000000",
-    "https://moscow.drom.ru/volkswagen/?minprice=100000&maxprice=3000000",
+    # Moscow — top brands + price tiers
+    "https://moscow.drom.ru/toyota/?minprice=100000&maxprice=800000",
+    "https://moscow.drom.ru/toyota/?minprice=800000&maxprice=2000000",
+    "https://moscow.drom.ru/hyundai/?minprice=100000&maxprice=1500000",
+    "https://moscow.drom.ru/kia/?minprice=100000&maxprice=1500000",
+    "https://moscow.drom.ru/bmw/?minprice=200000&maxprice=2000000",
+    "https://moscow.drom.ru/nissan/?minprice=100000&maxprice=1500000",
+    "https://moscow.drom.ru/volkswagen/?minprice=100000&maxprice=1500000",
+    "https://moscow.drom.ru/mazda/?minprice=100000&maxprice=1500000",
+    "https://moscow.drom.ru/honda/?minprice=100000&maxprice=1500000",
+    "https://moscow.drom.ru/mitsubishi/?minprice=100000&maxprice=1500000",
     # Krasnodar
-    "https://krasnodar.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://krasnodar.drom.ru/lada/?minprice=100000&maxprice=3000000",
-    "https://krasnodar.drom.ru/hyundai/?minprice=100000&maxprice=3000000",
+    "https://krasnodar.drom.ru/toyota/?minprice=100000&maxprice=2000000",
+    "https://krasnodar.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    "https://krasnodar.drom.ru/hyundai/?minprice=100000&maxprice=1500000",
+    "https://krasnodar.drom.ru/kia/?minprice=100000&maxprice=1500000",
     # St. Petersburg
-    "https://spb.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://spb.drom.ru/hyundai/?minprice=100000&maxprice=3000000",
-    "https://spb.drom.ru/kia/?minprice=100000&maxprice=3000000",
+    "https://spb.drom.ru/toyota/?minprice=100000&maxprice=2000000",
+    "https://spb.drom.ru/hyundai/?minprice=100000&maxprice=1500000",
+    "https://spb.drom.ru/kia/?minprice=100000&maxprice=1500000",
+    "https://spb.drom.ru/volkswagen/?minprice=100000&maxprice=1500000",
     # Samara
-    "https://samara.drom.ru/lada/?minprice=100000&maxprice=3000000",
-    "https://samara.drom.ru/toyota/?minprice=100000&maxprice=3000000",
+    "https://samara.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    "https://samara.drom.ru/toyota/?minprice=100000&maxprice=1500000",
     # Ekaterinburg
-    "https://ekaterinburg.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://ekaterinburg.drom.ru/lada/?minprice=100000&maxprice=3000000",
-    "https://ekaterinburg.drom.ru/kia/?minprice=100000&maxprice=3000000",
+    "https://ekaterinburg.drom.ru/toyota/?minprice=100000&maxprice=1500000",
+    "https://ekaterinburg.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    "https://ekaterinburg.drom.ru/kia/?minprice=100000&maxprice=1500000",
     # Novosibirsk
-    "https://novosibirsk.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://novosibirsk.drom.ru/hyundai/?minprice=100000&maxprice=3000000",
+    "https://novosibirsk.drom.ru/toyota/?minprice=100000&maxprice=1500000",
+    "https://novosibirsk.drom.ru/hyundai/?minprice=100000&maxprice=1500000",
     # Kazan
-    "https://kazan.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://kazan.drom.ru/lada/?minprice=100000&maxprice=3000000",
+    "https://kazan.drom.ru/toyota/?minprice=100000&maxprice=1500000",
+    "https://kazan.drom.ru/lada/?minprice=100000&maxprice=1000000",
     # Rostov
-    "https://rostov.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://rostov.drom.ru/kia/?minprice=100000&maxprice=3000000",
+    "https://rostov.drom.ru/toyota/?minprice=100000&maxprice=1500000",
+    "https://rostov.drom.ru/kia/?minprice=100000&maxprice=1500000",
     # Nizhny Novgorod
-    "https://nn.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://nn.drom.ru/lada/?minprice=100000&maxprice=3000000",
+    "https://nn.drom.ru/toyota/?minprice=100000&maxprice=1500000",
+    "https://nn.drom.ru/lada/?minprice=100000&maxprice=1000000",
 ]
 
 

@@ -42,15 +42,25 @@ HEADERS = {
 # Default search URLs — geo_id appended as query param
 # geo_ids: Moscow=213, SPb=2, Krasnodar=35, Samara=51
 DEFAULT_SEARCHES = [
-    {"url": "https://auto.ru/cars/toyota/used/?geo_id=213&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/hyundai/used/?geo_id=213&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/kia/used/?geo_id=213&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/toyota/used/?geo_id=35&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/vaz/used/?geo_id=35&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/hyundai/used/?geo_id=2&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/kia/used/?geo_id=2&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/vaz/used/?geo_id=51&price_from=100000&price_to=3000000"},
-    {"url": "https://auto.ru/cars/toyota/used/?geo_id=51&price_from=100000&price_to=3000000"},
+    # Moscow (213) — price tiers + more brands
+    {"url": "https://auto.ru/cars/toyota/used/?geo_id=213&price_from=100000&price_to=800000"},
+    {"url": "https://auto.ru/cars/toyota/used/?geo_id=213&price_from=800000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/hyundai/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    {"url": "https://auto.ru/cars/kia/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    {"url": "https://auto.ru/cars/nissan/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    {"url": "https://auto.ru/cars/mazda/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    {"url": "https://auto.ru/cars/volkswagen/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    # Krasnodar (35)
+    {"url": "https://auto.ru/cars/toyota/used/?geo_id=35&price_from=100000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/vaz/used/?geo_id=35&price_from=100000&price_to=1000000"},
+    {"url": "https://auto.ru/cars/hyundai/used/?geo_id=35&price_from=100000&price_to=1500000"},
+    # SPb (2)
+    {"url": "https://auto.ru/cars/toyota/used/?geo_id=2&price_from=100000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/hyundai/used/?geo_id=2&price_from=100000&price_to=1500000"},
+    {"url": "https://auto.ru/cars/kia/used/?geo_id=2&price_from=100000&price_to=1500000"},
+    # Samara (51)
+    {"url": "https://auto.ru/cars/vaz/used/?geo_id=51&price_from=100000&price_to=1000000"},
+    {"url": "https://auto.ru/cars/toyota/used/?geo_id=51&price_from=100000&price_to=1500000"},
 ]
 
 # Auto.ru stores data in __SSR_DATA__ (previously was __INITIAL_STATE__)

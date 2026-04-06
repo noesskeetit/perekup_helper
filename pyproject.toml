@@ -16,7 +16,6 @@ dependencies = [
     "httpx>=0.25,<1",
     "beautifulsoup4>=4.12,<5",
     "lxml>=5.0,<6",
-    "anthropic>=0.39,<1",
     "jinja2>=3.1,<4",
     "apscheduler>=3.10,<4",
 ]
@@ -34,7 +33,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["app*", "bot*", "perekup_helper*", "avito_parser*", "autoru_parser*"]
+include = ["app*", "bot*", "perekup_helper*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

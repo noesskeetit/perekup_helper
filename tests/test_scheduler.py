@@ -6,20 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from avito_parser.pipeline import PipelineResult
-
-
-class TestPipelineResult:
-    def test_total_sums_new_and_updated(self):
-        r = PipelineResult(new=3, updated=5, analyzed=2)
-        assert r.total == 8
-
-    def test_defaults_are_zero(self):
-        r = PipelineResult()
-        assert r.new == 0
-        assert r.updated == 0
-        assert r.analyzed == 0
-        assert r.total == 0
+from app.parsers.pipeline import PipelineResult
 
 
 class TestStartStopScheduler:
@@ -117,9 +104,9 @@ class TestStartStopScheduler:
 class TestParseJob:
     @pytest.mark.asyncio
     async def test_parse_job_logs_result(self):
-        fake_result = PipelineResult(new=2, updated=1, analyzed=3)
+        fake_result = PipelineResult(total_new=2, total_scored=1, total_analyzed=3)
 
-        with patch("app.scheduler.scrape_and_save", new_callable=AsyncMock, return_value=fake_result):
+        with patch("app.scheduler.run_pipeline", new_callable=AsyncMock, return_value=fake_result):
             from app.scheduler import _parse_job
 
             # Should not raise
@@ -127,7 +114,7 @@ class TestParseJob:
 
     @pytest.mark.asyncio
     async def test_parse_job_handles_exception(self):
-        with patch("app.scheduler.scrape_and_save", new_callable=AsyncMock, side_effect=RuntimeError("DB down")):
+        with patch("app.scheduler.run_pipeline", new_callable=AsyncMock, side_effect=RuntimeError("DB down")):
             from app.scheduler import _parse_job
 
             # Should swallow exception without re-raising

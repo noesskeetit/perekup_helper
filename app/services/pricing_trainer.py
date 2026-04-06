@@ -103,12 +103,16 @@ async def score_listings(limit: int = 500) -> int:
         # Prepare features
         feature_dicts = []
         for listing in listings:
+            year = listing.year or 2020
+            mileage = listing.mileage or 0
+            car_age = CURRENT_YEAR - year
+
             feature_dicts.append(
                 {
                     "brand": listing.brand or "unknown",
                     "model": listing.model or "unknown",
-                    "year": listing.year or 2020,
-                    "mileage": listing.mileage or 0,
+                    "year": year,
+                    "mileage": mileage,
                     "price": listing.price,
                     "source": listing.source or "unknown",
                     "city": listing.city or "unknown",
@@ -119,6 +123,11 @@ async def score_listings(limit: int = 500) -> int:
                     "engine_volume": listing.engine_volume or 0.0,
                     "power_hp": listing.power_hp or 0,
                     "owners_count": listing.owners_count or 0,
+                    "car_age": car_age,
+                    "log_car_age": math.log(car_age + 1),
+                    "log_mileage": math.log(mileage + 1),
+                    "mileage_per_year": mileage / max(car_age, 1),
+                    "mileage_ratio": mileage / (car_age * 15_000 + 1),
                 }
             )
 

@@ -224,10 +224,7 @@ def compute_comparable_price(comparables: list[dict[str, Any]]) -> dict[str, Any
     p75_price = _percentile(prices, 75)
 
     # Confidence: linear scale from 0.2 (1 comparable) to 1.0 (≥10 comparables)
-    if count >= 10:
-        confidence = 1.0
-    else:
-        confidence = round(0.2 + 0.8 * (count - 1) / 9, 2)
+    confidence = 1.0 if count >= 10 else round(0.2 + 0.8 * (count - 1) / 9, 2)
 
     return {
         "median_price": int(median_price),

@@ -124,11 +124,12 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
             from app.services.analysis_pool import run_analysis_pool
 
             pool_result = await run_analysis_pool(max_total=result.total_new + 50)
-            result.total_analyzed = pool_result["analyzed"]
+            result.total_analyzed = pool_result["processed"]
             logger.info(
-                "Pipeline: analyzed %d listings via %d workers",
-                pool_result["analyzed"],
+                "Pipeline: analyzed %d listings via %d workers (failed=%d)",
+                pool_result["processed"],
                 pool_result["workers"],
+                pool_result["failed"],
             )
         except Exception as exc:
             logger.exception("Pipeline: analysis failed")

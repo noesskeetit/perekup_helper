@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from dataclasses import dataclass, field
 
 from sqlalchemy import func, select
 
@@ -50,6 +51,28 @@ SCALE_THRESHOLDS = [
     (50, 2),
     (0, 1),
 ]
+
+
+@dataclass
+class PoolMetrics:
+    """Metrics returned by run_analysis_pool."""
+
+    backlog: int = 0
+    workers: int = 0
+    processed: int = 0
+    failed: int = 0
+    errors: list[str] = field(default_factory=list)
+    details: list[dict] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "backlog": self.backlog,
+            "workers": self.workers,
+            "processed": self.processed,
+            "failed": self.failed,
+            "errors": self.errors,
+            "details": self.details,
+        }
 
 
 async def get_backlog_size() -> int:
@@ -122,12 +145,12 @@ async def _run_cloudru_worker(name: str, model: str, limit: int) -> int:
 async def run_analysis_pool(max_total: int = 2000) -> dict:
     """Run auto-scaling analysis pool.
 
-    Returns dict with per-worker stats and total analyzed.
+    Returns dict with metrics: backlog, workers, processed, failed, errors, details.
     """
     backlog = await get_backlog_size()
     if backlog == 0:
         logger.info("Analysis pool: no backlog, skipping")
-        return {"backlog": 0, "workers": 0, "analyzed": 0}
+        return PoolMetrics().to_dict()
 
     num_workers = _pick_worker_count(backlog)
     per_worker = min(max_total // num_workers, backlog // num_workers + 1)
@@ -147,20 +170,22 @@ async def run_analysis_pool(max_total: int = 2000) -> dict:
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    total_analyzed = 0
-    worker_stats = []
+    metrics = PoolMetrics(backlog=backlog, workers=num_workers)
+
     for cfg, result in zip(configs, results, strict=False):
         if isinstance(result, Exception):
             logger.error("Worker [%s] failed: %s", cfg["name"], result)
-            worker_stats.append({"name": cfg["name"], "analyzed": 0, "error": str(result)})
+            metrics.failed += 1
+            metrics.errors.append(f"{cfg['name']}: {result}")
+            metrics.details.append({"name": cfg["name"], "processed": 0, "error": str(result)})
         else:
-            total_analyzed += result
-            worker_stats.append({"name": cfg["name"], "analyzed": result})
+            metrics.processed += result
+            metrics.details.append({"name": cfg["name"], "processed": result})
 
-    logger.info("Analysis pool done: %d total analyzed by %d workers", total_analyzed, num_workers)
-    return {
-        "backlog": backlog,
-        "workers": num_workers,
-        "analyzed": total_analyzed,
-        "details": worker_stats,
-    }
+    logger.info(
+        "Analysis pool done: processed=%d, failed=%d by %d workers",
+        metrics.processed,
+        metrics.failed,
+        num_workers,
+    )
+    return metrics.to_dict()

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     cloudru_ocr_model: str = "deepseek-ai/DeepSeek-OCR-2"
     cloudru_text_model: str = "zai-org/GLM-4.7"
     ai_provider: str = "cloudru"  # "cloudru" or "openrouter"
+    cloudru_concurrency: int = 5  # max concurrent Cloud.ru requests
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

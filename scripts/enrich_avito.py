@@ -17,6 +17,7 @@ PAUSE = 2.0
 
 async def main():
     from dotenv import load_dotenv
+
     load_dotenv()
 
     from load_config import load_avito_config
@@ -84,10 +85,29 @@ async def main():
                 db_obj = await session.get(Listing, db_listing.id)
                 if db_obj:
                     for field in [
-                        "mileage", "engine_type", "engine_volume", "power_hp",
-                        "transmission", "drive_type", "body_type", "color",
-                        "vin", "owners_count", "description",
-                        "steering_wheel", "condition",
+                        "mileage",
+                        "engine_type",
+                        "engine_volume",
+                        "power_hp",
+                        "transmission",
+                        "drive_type",
+                        "body_type",
+                        "color",
+                        "vin",
+                        "owners_count",
+                        "description",
+                        "steering_wheel",
+                        "condition",
+                        "pts_type",
+                        "customs_cleared",
+                        "generation",
+                        "modification",
+                        "seller_type",
+                        "seller_name",
+                        "region",
+                        "listing_date",
+                        "is_dealer",
+                        "photo_count",
                     ]:
                         val = getattr(temp, field, None)
                         if val is not None and getattr(db_obj, field, None) is None:
@@ -103,6 +123,7 @@ async def main():
                 if blocked >= 3:
                     print(f"  Too many blocks ({blocked}), changing IP...")
                     from app.parsers.proxy_manager import change_ip
+
                     change_ip()
                     blocked = 0
 

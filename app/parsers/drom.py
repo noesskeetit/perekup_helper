@@ -243,7 +243,7 @@ class DromParser(BaseParser):
             try:
                 data = json.loads(script.string or "")
                 if data.get("@type") == "Car":
-                    return self._parse_json_ld_car(data, url, specs)
+                    return self._parse_json_ld_car(data, url, specs, soup)
             except (json.JSONDecodeError, KeyError):
                 continue
 
@@ -267,7 +267,13 @@ class DromParser(BaseParser):
                         specs[key] = value
         return specs
 
-    def _parse_json_ld_car(self, data: dict, url: str, specs: dict[str, str] | None = None) -> ParsedListing | None:
+    def _parse_json_ld_car(
+        self,
+        data: dict,
+        url: str,
+        specs: dict[str, str] | None = None,
+        soup: BeautifulSoup | None = None,
+    ) -> ParsedListing | None:
         """Parse JSON-LD @type=Car + HTML specs table into ParsedListing."""
         if specs is None:
             specs = {}
@@ -295,12 +301,17 @@ class DromParser(BaseParser):
         if m:
             external_id = m.group(1)
 
-        image_url = ""
-        img = data.get("image", {})
-        if isinstance(img, dict):
-            image_url = img.get("url", "")
-        elif isinstance(img, str):
-            image_url = img
+        # Collect all photo URLs from HTML gallery, falling back to JSON-LD image
+        photos = self._extract_photo_urls(soup) if soup else []
+        if not photos:
+            image_url = ""
+            img = data.get("image", {})
+            if isinstance(img, dict):
+                image_url = img.get("url", "")
+            elif isinstance(img, str):
+                image_url = img
+            if image_url:
+                photos = [image_url]
 
         description = data.get("description")
 
@@ -311,6 +322,9 @@ class DromParser(BaseParser):
         from app.parsers.normalizer import extract_city_from_drom_url
 
         city = extract_city_from_drom_url(url)
+
+        # Region from URL subdomain (broader than city)
+        region = self._extract_region_from_url(url)
 
         # VIN from JSON-LD
         vin = data.get("vehicleIdentificationNumber")
@@ -365,6 +379,31 @@ class DromParser(BaseParser):
         # Modification / trim
         modification = specs.get("Комплектация")
 
+        # PTS type: "оригинал", "дубликат", "электронный"
+        pts_type = specs.get("ПТС")
+
+        # Condition: "не битый", "битый"
+        condition = specs.get("Состояние")
+
+        # Customs cleared
+        customs_raw = specs.get("Растаможен") or specs.get("Таможня")
+        customs_cleared = None
+        if customs_raw:
+            customs_cleared = customs_raw.strip().lower() in ("да", "растаможен")
+
+        # Seller info from HTML and JSON-LD
+        seller_type, seller_name, is_dealer = self._extract_seller_info(soup)
+
+        # Listing date from JSON-LD offers.validFrom or HTML
+        listing_date = self._extract_listing_date(data, soup)
+
+        # Build raw_data with all extras
+        raw_data: dict = {}
+        if specs:
+            raw_data["specs"] = specs
+        if customs_raw:
+            raw_data["customs_raw"] = customs_raw
+
         return ParsedListing(
             source="drom",
             external_id=external_id,
@@ -375,7 +414,7 @@ class DromParser(BaseParser):
             url=url,
             mileage=mileage,
             description=description,
-            photos=[image_url] if image_url else [],
+            photos=photos,
             city=city,
             vin=vin,
             engine_type=engine_type,
@@ -389,7 +428,16 @@ class DromParser(BaseParser):
             owners_count=owners_count,
             generation=generation,
             modification=modification,
-            raw_data={"specs": specs} if specs else None,
+            seller_type=seller_type,
+            seller_name=seller_name,
+            is_dealer=is_dealer,
+            region=region,
+            listing_date=listing_date,
+            pts_type=pts_type,
+            condition=condition,
+            customs_cleared=customs_cleared,
+            photo_count=len(photos),
+            raw_data=raw_data if raw_data else None,
         )
 
     def _try_preloaded_state(self, html: str, url: str) -> ParsedListing | None:
@@ -418,12 +466,14 @@ class DromParser(BaseParser):
         if match:
             external_id = match.group(1)
 
-        # Photos from gallery
-        photos = []
+        # Photos from gallery (collect all, not just first 5)
+        photos: list[str] = []
         gallery = state.get("gallery", {}).get("photos", {}).get("images", [])
-        for img in gallery[:5]:
+        for img in gallery:
             if isinstance(img, dict):
-                photos.append(img.get("src", ""))
+                src = img.get("src", "")
+                if src:
+                    photos.append(src)
 
         if not external_id or not brand:
             return None
@@ -466,6 +516,59 @@ class DromParser(BaseParser):
             digits = re.sub(r"[^\d]", "", mileage_raw)
             mileage = int(digits) if digits else None
 
+        # VIN from preloaded state
+        vin = desc.get("vin") or state.get("vin")
+
+        # Description from preloaded state
+        description = desc.get("description") or desc.get("text")
+
+        # Generation and modification from fields
+        generation = fields.get("Поколение")
+        modification = fields.get("Комплектация")
+
+        # PTS type
+        pts_type = fields.get("ПТС")
+
+        # Condition
+        condition = fields.get("Состояние")
+
+        # Customs
+        customs_raw = fields.get("Растаможен") or fields.get("Таможня")
+        customs_cleared = None
+        if customs_raw:
+            customs_cleared = customs_raw.strip().lower() in ("да", "растаможен")
+
+        # Region from URL
+        region = self._extract_region_from_url(url)
+
+        # Seller info from preloaded state
+        seller_info = state.get("seller", {})
+        seller_name = None
+        seller_type = None
+        is_dealer = False
+        if isinstance(seller_info, dict):
+            seller_name = seller_info.get("name") or seller_info.get("title")
+            seller_type_raw = seller_info.get("type", "")
+            if seller_type_raw:
+                seller_type = seller_type_raw
+            is_dealer = seller_info.get("isDealer", False) or seller_type_raw.lower() in (
+                "дилер",
+                "dealer",
+                "салон",
+            )
+            if not seller_type and is_dealer:
+                seller_type = "дилер"
+
+        # Listing date from preloaded state
+        listing_date = desc.get("date") or desc.get("datePublished")
+
+        # Build raw_data with all extras
+        raw_data: dict = {}
+        if fields:
+            raw_data["fields"] = fields
+        if customs_raw:
+            raw_data["customs_raw"] = customs_raw
+
         return ParsedListing(
             source="drom",
             external_id=external_id,
@@ -475,8 +578,10 @@ class DromParser(BaseParser):
             price=int(price) if price else 0,
             url=url,
             mileage=mileage,
+            description=description,
             photos=[p for p in photos if p],
             city=extract_city_from_drom_url(url),
+            vin=vin,
             transmission=transmission,
             drive_type=drive_type,
             body_type=body_type,
@@ -486,8 +591,180 @@ class DromParser(BaseParser):
             engine_type=engine_type,
             engine_volume=engine_volume,
             power_hp=power_hp,
-            raw_data={"fields": fields} if fields else None,
+            generation=generation,
+            modification=modification,
+            seller_type=seller_type,
+            seller_name=seller_name,
+            is_dealer=is_dealer,
+            region=region,
+            listing_date=listing_date,
+            pts_type=pts_type,
+            condition=condition,
+            customs_cleared=customs_cleared,
+            photo_count=len(photos),
+            raw_data=raw_data if raw_data else None,
         )
+
+    @staticmethod
+    def _extract_photo_urls(soup: BeautifulSoup | None) -> list[str]:
+        """Extract all photo URLs from the card page gallery.
+
+        Drom gallery images are in <img> tags or <a> links with large photo URLs.
+        Patterns: //s1.drom.ru/photo/... or //pics.drom.ru/...
+        """
+        if soup is None:
+            return []
+        photos: list[str] = []
+        seen: set[str] = set()
+        photo_re = re.compile(r"https?://[a-z0-9]+\.drom\.ru/(?:photo|pics)/[^\s\"']+")
+        # Check img tags
+        for img_tag in soup.find_all("img", src=True):
+            src = img_tag["src"]
+            if photo_re.search(src) and src not in seen:
+                photos.append(src)
+                seen.add(src)
+        # Check a tags with href pointing to full-size images
+        for a_tag in soup.find_all("a", href=True):
+            href = a_tag["href"]
+            if photo_re.search(href) and href not in seen:
+                photos.append(href)
+                seen.add(href)
+        return photos
+
+    @staticmethod
+    def _extract_region_from_url(url: str) -> str | None:
+        """Extract region name from Drom URL.
+
+        Maps city subdomains to their federal regions.
+        """
+        from app.parsers.normalizer import DROM_CITY_MAP
+
+        # Drom city → region mapping
+        city_region_map: dict[str, str] = {
+            "moscow": "Москва",
+            "spb": "Санкт-Петербург",
+            "krasnodar": "Краснодарский край",
+            "samara": "Самарская область",
+            "ekaterinburg": "Свердловская область",
+            "novosibirsk": "Новосибирская область",
+            "kazan": "Республика Татарстан",
+            "rostov": "Ростовская область",
+            "nn": "Нижегородская область",
+            "nnovgorod": "Нижегородская область",
+            "nizhniynovgorod": "Нижегородская область",
+            "chelyabinsk": "Челябинская область",
+            "voronezh": "Воронежская область",
+            "volgograd": "Волгоградская область",
+            "ufa": "Республика Башкортостан",
+            "perm": "Пермский край",
+            "krasnoyarsk": "Красноярский край",
+            "omsk": "Омская область",
+            "vladivostok": "Приморский край",
+            "habarovsk": "Хабаровский край",
+            "irkutsk": "Иркутская область",
+            "tula": "Тульская область",
+            "barnaul": "Алтайский край",
+            "tyumen": "Тюменская область",
+            "saratov": "Саратовская область",
+            "tolyatti": "Самарская область",
+            "izhevsk": "Удмуртская Республика",
+        }
+        # Card URL: auto.drom.ru/CITY/...
+        m_path = re.match(r"https?://auto\.drom\.ru/(\w+)/", url)
+        if m_path:
+            slug = m_path.group(1)
+            if slug in city_region_map:
+                return city_region_map[slug]
+            # Fall back to city name from DROM_CITY_MAP
+            return DROM_CITY_MAP.get(slug)
+        # Listing URL: CITY.drom.ru/...
+        m_sub = re.match(r"https?://(\w+)\.drom\.ru/", url)
+        if m_sub and m_sub.group(1) != "auto":
+            slug = m_sub.group(1)
+            if slug in city_region_map:
+                return city_region_map[slug]
+            return DROM_CITY_MAP.get(slug)
+        return None
+
+    @staticmethod
+    def _extract_seller_info(
+        soup: BeautifulSoup | None,
+    ) -> tuple[str | None, str | None, bool]:
+        """Extract seller type, name, and dealer flag from Drom card page HTML.
+
+        Returns (seller_type, seller_name, is_dealer).
+
+        Drom pages typically show seller info in a block containing
+        "Частное лицо" / "Автодилер" / dealer name text.
+        """
+        if soup is None:
+            return None, None, False
+
+        seller_type = None
+        seller_name = None
+        is_dealer = False
+
+        page_text = soup.get_text(" ", strip=True).lower()
+
+        # Check for dealer indicators in page text
+        dealer_patterns = ["автодилер", "автосалон", "официальный дилер"]
+        for pattern in dealer_patterns:
+            if pattern in page_text:
+                is_dealer = True
+                seller_type = "дилер"
+                break
+
+        if not seller_type and "частное лицо" in page_text:
+            seller_type = "частное лицо"
+
+        # Try to extract seller name from common Drom patterns
+        # Look for links to dealer pages: /dealer/ or /salon/
+        for a_tag in soup.find_all("a", href=True):
+            href = a_tag.get("href", "")
+            if "/dealer/" in href or "/salon/" in href or "/company/" in href:
+                name = a_tag.get_text(strip=True)
+                if name and len(name) > 2:
+                    seller_name = name
+                    is_dealer = True
+                    if not seller_type:
+                        seller_type = "дилер"
+                    break
+
+        return seller_type, seller_name, is_dealer
+
+    @staticmethod
+    def _extract_listing_date(json_ld: dict | None, soup: BeautifulSoup | None) -> str | None:
+        """Extract listing publication date.
+
+        Sources (in priority order):
+        1. JSON-LD offers.validFrom / datePosted
+        2. HTML meta tags or visible date text
+        """
+        # 1. JSON-LD
+        if json_ld:
+            offers = json_ld.get("offers", {})
+            if isinstance(offers, dict):
+                date = offers.get("validFrom") or offers.get("availabilityStarts")
+                if date:
+                    return str(date)
+            date = json_ld.get("datePosted") or json_ld.get("datePublished")
+            if date:
+                return str(date)
+
+        # 2. HTML meta tag
+        if soup:
+            for meta in soup.find_all("meta"):
+                prop = meta.get("property", "") or meta.get("name", "")
+                if prop in (
+                    "article:published_time",
+                    "datePublished",
+                    "og:updated_time",
+                ):
+                    content = meta.get("content", "")
+                    if content:
+                        return content
+
+        return None
 
     @staticmethod
     def _get_proxy_url() -> str | None:

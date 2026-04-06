@@ -514,3 +514,188 @@ async def model_info():
     from app.services.pricing import get_price_model
 
     return get_price_model().get_info()
+
+
+@app.get("/api/dashboard")
+async def dashboard():
+    """All-in-one dashboard payload for Telegram bot or mobile app.
+
+    Returns stats, top deals, recent price drops, fresh listings,
+    and model health in a single DB session.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import case, desc, func, select
+    from sqlalchemy.orm import selectinload
+
+    from app.db.session import async_session_factory
+    from app.models.listing import Listing, ListingAnalysis
+    from app.services.deal_scorer import compute_deal_score
+    from app.services.pricing import get_price_model
+
+    now = datetime.now(UTC)
+
+    async with async_session_factory() as session:
+        # ── 1. Aggregate stats ──
+        total_col = func.count(Listing.id)
+        unique_col = func.count(case((Listing.is_duplicate.is_(False), Listing.id)))
+        hot_col = func.count(
+            case(
+                (
+                    (Listing.is_duplicate.is_(False)) & (Listing.price_diff_pct > 15),
+                    Listing.id,
+                )
+            )
+        )
+
+        agg_stmt = select(total_col, unique_col, hot_col)
+        agg_row = (await session.execute(agg_stmt)).one()
+        total_listings = agg_row[0] or 0
+        unique_listings = agg_row[1] or 0
+        hot_deals_count = agg_row[2] or 0
+
+        # By-source breakdown
+        src_stmt = select(Listing.source, func.count(Listing.id)).group_by(Listing.source)
+        src_rows = (await session.execute(src_stmt)).all()
+        by_source = {row[0]: row[1] for row in src_rows}
+
+        # Analyzed count
+        analyzed_stmt = select(func.count(ListingAnalysis.id))
+        analyzed_count = (await session.execute(analyzed_stmt)).scalar() or 0
+
+        # ── 2. Top 5 deals by deal_score ──
+        top_stmt = (
+            select(Listing)
+            .options(selectinload(Listing.analysis))
+            .join(ListingAnalysis)
+            .where(
+                Listing.is_duplicate.is_(False),
+                ListingAnalysis.score.isnot(None),
+            )
+            .order_by(desc(ListingAnalysis.score))
+            .limit(5)
+        )
+        top_result = await session.execute(top_stmt)
+        top_listings = list(top_result.scalars().all())
+
+        # Fallback: if fewer than 5 pre-scored, fill from high price_diff_pct
+        if len(top_listings) < 5:
+            remaining = 5 - len(top_listings)
+            scored_ids = {item.id for item in top_listings}
+            fb_stmt = (
+                select(Listing)
+                .options(selectinload(Listing.analysis))
+                .where(
+                    Listing.is_duplicate.is_(False),
+                    Listing.market_price.isnot(None),
+                    Listing.price_diff_pct.isnot(None),
+                    Listing.id.notin_(scored_ids) if scored_ids else True,
+                )
+                .order_by(desc(Listing.price_diff_pct))
+                .limit(remaining * 2)
+            )
+            fb_result = await session.execute(fb_stmt)
+            candidates = list(fb_result.scalars().all())
+            computed = []
+            for listing in candidates:
+                s = await compute_deal_score(listing)
+                computed.append((listing, s))
+            computed.sort(key=lambda x: x[1], reverse=True)
+            top_listings.extend([pair[0] for pair in computed[:remaining]])
+
+        top_deals = []
+        for listing in top_listings:
+            deal_score = (
+                listing.analysis.score
+                if listing.analysis and listing.analysis.score is not None
+                else await compute_deal_score(listing)
+            )
+            top_deals.append(
+                {
+                    "brand": listing.brand,
+                    "model": listing.model,
+                    "year": listing.year,
+                    "price": listing.price,
+                    "market_price": listing.market_price,
+                    "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
+                    "deal_score": int(deal_score),
+                    "url": listing.url,
+                }
+            )
+        top_deals.sort(key=lambda d: d["deal_score"], reverse=True)
+
+        # ── 3. Recent price drops (last 5) ──
+        drops_stmt = (
+            select(Listing)
+            .options(selectinload(Listing.analysis))
+            .where(
+                Listing.is_duplicate.is_(False),
+                Listing.raw_data.isnot(None),
+            )
+            .order_by(Listing.updated_at.desc())
+            .limit(200)
+        )
+        drops_result = await session.execute(drops_stmt)
+        drop_candidates = drops_result.scalars().all()
+
+        recent_price_drops = []
+        for listing in drop_candidates:
+            dropped, drop_pct = _price_drop_info(listing)
+            if not dropped:
+                continue
+            history = (listing.raw_data or {}).get("price_history", [])
+            old_price = history[-1].get("price") if history else None
+            recent_price_drops.append(
+                {
+                    "brand": listing.brand,
+                    "model": listing.model,
+                    "price": listing.price,
+                    "old_price": old_price,
+                    "drop_pct": drop_pct,
+                    "url": listing.url,
+                }
+            )
+            if len(recent_price_drops) >= 5:
+                break
+
+        # ── 4. Fresh listings (5 newest) ──
+        fresh_stmt = select(Listing).where(Listing.is_duplicate.is_(False)).order_by(Listing.created_at.desc()).limit(5)
+        fresh_result = await session.execute(fresh_stmt)
+        fresh_rows = fresh_result.scalars().all()
+
+        fresh_listings = []
+        for listing in fresh_rows:
+            age_minutes = (now - listing.created_at).total_seconds() / 60 if listing.created_at else None
+            fresh_listings.append(
+                {
+                    "brand": listing.brand,
+                    "model": listing.model,
+                    "year": listing.year,
+                    "price": listing.price,
+                    "source": listing.source,
+                    "age_minutes": round(age_minutes, 1) if age_minutes is not None else None,
+                }
+            )
+
+    # ── 5. Model health (outside session — no DB needed) ──
+    model = get_price_model()
+    info = model.get_info()
+    model_health = {
+        "is_trained": info["is_trained"],
+        "samples": info["training_size"],
+        "p50_mape": None,
+    }
+
+    return {
+        "stats": {
+            "total": total_listings,
+            "unique": unique_listings,
+            "analyzed": analyzed_count,
+            "hot_deals": hot_deals_count,
+            "by_source": by_source,
+        },
+        "top_deals": top_deals[:5],
+        "recent_price_drops": recent_price_drops,
+        "fresh_listings": fresh_listings,
+        "model_health": model_health,
+    }

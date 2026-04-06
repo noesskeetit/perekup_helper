@@ -67,6 +67,7 @@ class PriceModel:
         self._trained_at: datetime | None = None
         self._training_size: int = 0
         self._feature_names: list[str] = ALL_FEATURES
+        self._quantile_metrics: dict = {}
 
     @property
     def is_trained(self) -> bool:
@@ -147,6 +148,7 @@ class PriceModel:
 
         self._trained_at = datetime.now(UTC)
         self._training_size = len(df)
+        self._quantile_metrics = stats["quantile_metrics"]
 
         # Feature importance (from P50 model)
         importance = self._models[0.50].get_feature_importance()
@@ -216,6 +218,7 @@ class PriceModel:
             "trained_at": self._trained_at,
             "training_size": self._training_size,
             "feature_names": self._feature_names,
+            "quantile_metrics": self._quantile_metrics,
         }
         with open(METADATA_PATH, "wb") as f:
             pickle.dump(meta, f)
@@ -239,6 +242,7 @@ class PriceModel:
                     meta = pickle.load(f)
                     self._trained_at = meta.get("trained_at")
                     self._training_size = meta.get("training_size", 0)
+                    self._quantile_metrics = meta.get("quantile_metrics", {})
 
             logger.info(
                 "Price model loaded: %d quantile models, trained on %d samples", len(self._models), self._training_size
@@ -255,6 +259,7 @@ class PriceModel:
             "trained_at": self._trained_at.isoformat() if self._trained_at else None,
             "training_size": self._training_size,
             "quantiles": [f"P{int(q * 100)}" for q in QUANTILES],
+            "p50_mape": self._quantile_metrics.get("P50", {}).get("mape"),
         }
 
     def _prepare_data(self, df: pd.DataFrame) -> pd.DataFrame:

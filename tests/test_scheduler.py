@@ -11,7 +11,6 @@ from app.parsers.pipeline import PipelineResult
 
 class TestStartStopScheduler:
     def setup_method(self):
-        # Reset module-level singleton between tests
         import app.scheduler as sched_mod
 
         sched_mod._scheduler = None
@@ -33,7 +32,7 @@ class TestStartStopScheduler:
 
         result = start_scheduler()
 
-        mock_instance.add_job.assert_called_once()
+        assert mock_instance.add_job.call_count == 2  # parse + retrain
         mock_instance.start.assert_called_once()
         assert result is mock_instance
 
@@ -95,10 +94,9 @@ class TestStartStopScheduler:
 
         start_scheduler()
 
-        call_kwargs = mock_instance.add_job.call_args
-        assert call_kwargs.kwargs.get("minutes") == settings.parse_interval_minutes or (
-            len(call_kwargs.args) >= 3 and call_kwargs.args[2] == settings.parse_interval_minutes
-        )
+        # First add_job call is the parse job with interval minutes
+        first_call = mock_instance.add_job.call_args_list[0]
+        assert first_call.kwargs.get("minutes") == settings.parse_interval_minutes
 
 
 class TestParseJob:
@@ -106,16 +104,14 @@ class TestParseJob:
     async def test_parse_job_logs_result(self):
         fake_result = PipelineResult(total_new=2, total_scored=1, total_analyzed=3)
 
-        with patch("app.scheduler.run_pipeline", new_callable=AsyncMock, return_value=fake_result):
+        with patch("app.parsers.pipeline.run_pipeline", new_callable=AsyncMock, return_value=fake_result):
             from app.scheduler import _parse_job
 
-            # Should not raise
             await _parse_job()
 
     @pytest.mark.asyncio
     async def test_parse_job_handles_exception(self):
-        with patch("app.scheduler.run_pipeline", new_callable=AsyncMock, side_effect=RuntimeError("DB down")):
+        with patch("app.parsers.pipeline.run_pipeline", new_callable=AsyncMock, side_effect=RuntimeError("DB down")):
             from app.scheduler import _parse_job
 
-            # Should swallow exception without re-raising
             await _parse_job()

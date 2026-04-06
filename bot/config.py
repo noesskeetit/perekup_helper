@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     app_database_url: str | None = None
     check_interval_seconds: int = 300
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

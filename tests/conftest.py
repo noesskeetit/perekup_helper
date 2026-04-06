@@ -203,7 +203,7 @@ def _make_async_listings():
             mileage=30_000,
             price=1_500_000,
             market_price=1_700_000,
-            price_diff_pct=-11.8,
+            price_diff_pct=11.8,
             description="Один владелец",
             url="https://example.com/1",
             photos=["https://example.com/photo1.jpg", "https://example.com/photo2.jpg"],
@@ -283,6 +283,7 @@ def _make_async_listings():
             confidence=0.95,
             ai_summary="Один владелец, без ДТП",
             flags=None,
+            score=7.5,
         ),
         ListingAnalysis(
             id=uuid.uuid4(),

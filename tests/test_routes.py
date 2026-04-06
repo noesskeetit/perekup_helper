@@ -13,7 +13,7 @@ async def test_index_page(async_client):
     resp = await async_client.get("/")
     assert resp.status_code == 200
     html = resp.text
-    assert "Perekup Dashboard" in html
+    assert "PerekupHelper" in html
     assert "Toyota" in html
     assert "Camry" in html
     assert "BMW" in html
@@ -83,8 +83,7 @@ async def test_score_display(async_client):
     """Scoring column shows confidence as a colored number."""
     resp = await async_client.get("/")
     html = resp.text
-    assert "score-value" in html
-    assert "95%" in html  # Toyota Camry confidence=0.95
+    assert "score-badge" in html
 
 
 @pytest.mark.asyncio

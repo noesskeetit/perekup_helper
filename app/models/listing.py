@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, Uuid, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -20,18 +20,21 @@ class AnalysisCategory(str, enum.Enum):
 
 class Listing(Base):
     __tablename__ = "listings"
-    __table_args__ = (UniqueConstraint("source", "external_id", name="uq_source_external_id"),)
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_source_external_id"),
+        Index("ix_listings_not_dup_diff", "is_duplicate", "price_diff_pct", postgresql_where="is_duplicate = false"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    brand: Mapped[str] = mapped_column(String(100), nullable=False)
+    brand: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     model: Mapped[str] = mapped_column(String(100), nullable=False)
-    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     mileage: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    price: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     market_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    price_diff_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    price_diff_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     photos: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
@@ -45,7 +48,7 @@ class Listing(Base):
     body_type: Mapped[str | None] = mapped_column(String(50), nullable=True)  # седан, кроссовер, хэтчбек
     color: Mapped[str | None] = mapped_column(String(50), nullable=True)
     owners_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     steering_wheel: Mapped[str | None] = mapped_column(String(20), nullable=True)
     condition: Mapped[str | None] = mapped_column(String(50), nullable=True)
     generation: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -58,9 +61,9 @@ class Listing(Base):
     pts_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
     customs_cleared: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     photo_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
-    is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false", index=True)
     canonical_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

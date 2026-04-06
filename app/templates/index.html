@@ -128,7 +128,11 @@
 
     <div class="dashboard-main">
         <div class="results-summary">
-            Найдено: <strong>{{ total }}</strong> объявлений
+            <span>Найдено: <strong>{{ total }}</strong> объявлений</span>
+            <div class="view-toggle">
+                <button class="view-toggle-btn active" data-view="list" title="Список">&#9776;</button>
+                <button class="view-toggle-btn" data-view="grid" title="Сетка">&#9638;</button>
+            </div>
         </div>
 
         <div id="listings-content">
@@ -225,6 +229,46 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeModal();
 });
 document.addEventListener('DOMContentLoaded', restoreFilters);
+
+var VIEW_STORAGE_KEY = 'perekup_view';
+
+function applyView(view) {
+    var table = document.querySelector('.listings-table');
+    var cards = document.querySelector('.cards-grid');
+    if (!table || !cards) return;
+    if (view === 'grid') {
+        table.style.display = 'none';
+        cards.style.display = 'grid';
+    } else {
+        table.style.display = '';
+        cards.style.display = 'none';
+    }
+    document.querySelectorAll('.view-toggle-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+    });
+}
+
+function initViewToggle() {
+    var saved = 'list';
+    try { saved = localStorage.getItem(VIEW_STORAGE_KEY) || 'list'; } catch(e) {}
+    applyView(saved);
+    document.querySelectorAll('.view-toggle-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var view = this.getAttribute('data-view');
+            try { localStorage.setItem(VIEW_STORAGE_KEY, view); } catch(e) {}
+            applyView(view);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initViewToggle);
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'listings-content') {
+        var saved = 'list';
+        try { saved = localStorage.getItem(VIEW_STORAGE_KEY) || 'list'; } catch(e) {}
+        applyView(saved);
+    }
+});
 
 (function() {
     var toggle = document.getElementById('filters-toggle');

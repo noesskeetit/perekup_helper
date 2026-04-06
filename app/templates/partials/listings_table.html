@@ -119,6 +119,52 @@
     </tbody>
 </table>
 
+<div class="cards-grid" style="display:none">
+    {% for listing in listings %}
+    {% set analysis = listing.analysis %}
+    {% set cat = analysis.category if analysis else none %}
+    {% set diff = listing.price_diff_pct %}
+
+    <div class="listing-card" onclick="openDetail('{{ listing.id }}')">
+        <div class="card-photo">
+            {% if listing.photos and listing.photos | length > 0 %}
+            <img src="{{ listing.photos[0] }}" alt="{{ listing.brand }} {{ listing.model }}" loading="lazy">
+            {% else %}
+            <div class="no-photo">&#128247; Нет фото</div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="card-title">
+                <strong>{{ listing.brand }}</strong> {{ listing.model }}
+            </div>
+            <div class="card-year-mileage">
+                {{ listing.year }}{% if listing.mileage %} &middot; {{ "{:,.0f}".format(listing.mileage).replace(",", " ") }} км{% endif %}
+            </div>
+            <div class="card-price">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</div>
+            <div class="card-market-price">
+                {% if listing.market_price %}
+                Рынок: {{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;
+                {% endif %}
+            </div>
+            <div class="card-badges">
+                {% if diff is not none %}
+                <span class="diff-badge {% if diff|float > 15 %}diff-hot{% elif diff|float > 5 %}diff-good{% elif diff|float > 0 %}diff-ok{% elif diff|float > -10 %}diff-neutral{% else %}diff-bad{% endif %}">
+                    {% if diff|float > 0 %}&minus;{% elif diff|float < 0 %}+{% endif %}{{ "%.1f" | format(diff|float|abs) }}%
+                </span>
+                {% endif %}
+                {% if analysis %}
+                <span class="category-badge cat-{{ analysis.category }}">
+                    {{ categories.get(analysis.category, analysis.category) }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="cards-empty">Объявления не найдены</div>
+    {% endfor %}
+</div>
+
 {% if total_pages > 1 %}
 <div class="pagination">
     {% if page > 1 %}

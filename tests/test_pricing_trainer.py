@@ -55,6 +55,8 @@ def _make_df(
                 "engine_volume": 2.5,
                 "power_hp": 181,
                 "owners_count": 1,
+                "photo_count": 5,
+                "is_dealer": 0,
                 "listing_date": now - timedelta(days=days_old + i),
                 "created_at": now - timedelta(days=days_old + i),
             }
@@ -79,6 +81,8 @@ def _make_listing_ns(
     engine_volume: float = 2.5,
     power_hp: int = 181,
     owners_count: int = 1,
+    photo_count: int = 5,
+    is_dealer: bool = False,
     listing_date: datetime | None = None,
     created_at: datetime | None = None,
     is_duplicate: bool = False,
@@ -103,6 +107,8 @@ def _make_listing_ns(
         engine_volume=engine_volume,
         power_hp=power_hp,
         owners_count=owners_count,
+        photo_count=photo_count,
+        is_dealer=is_dealer,
         listing_date=listing_date or now,
         created_at=created_at or now,
         is_duplicate=is_duplicate,
@@ -356,29 +362,41 @@ class TestTimeDecayWeights:
 class TestFeatureDerivation:
     """Test PriceModel._add_derived_features (the real production function)."""
 
+    def _base_df(self, year=2020, mileage=50_000, brand="Toyota", engine_volume=2.5, power_hp=181):
+        """Build a minimal DataFrame suitable for _add_derived_features."""
+        return pd.DataFrame(
+            {
+                "year": [year],
+                "mileage": [mileage],
+                "brand": [brand],
+                "engine_volume": [engine_volume],
+                "power_hp": [power_hp],
+            }
+        )
+
     def test_car_age_computation(self):
         """_add_derived_features should compute car_age = CURRENT_YEAR - year."""
-        df = pd.DataFrame({"year": [2020], "mileage": [50_000]})
+        df = self._base_df()
         result = PriceModel._add_derived_features(df)
         expected_age = CURRENT_YEAR - 2020
         assert result["car_age"].iloc[0] == expected_age
 
     def test_log_car_age(self):
         """_add_derived_features should compute log(car_age + 1)."""
-        df = pd.DataFrame({"year": [2020], "mileage": [50_000]})
+        df = self._base_df()
         result = PriceModel._add_derived_features(df)
         expected_age = CURRENT_YEAR - 2020
         assert abs(result["log_car_age"].iloc[0] - math.log(expected_age + 1)) < 1e-9
 
     def test_log_mileage(self):
         """_add_derived_features should compute log(mileage + 1)."""
-        df = pd.DataFrame({"year": [2020], "mileage": [50_000]})
+        df = self._base_df()
         result = PriceModel._add_derived_features(df)
         assert abs(result["log_mileage"].iloc[0] - math.log(50_001)) < 1e-9
 
     def test_mileage_per_year(self):
         """_add_derived_features should compute mileage / max(car_age, 1)."""
-        df = pd.DataFrame({"year": [2020], "mileage": [60_000]})
+        df = self._base_df(mileage=60_000)
         result = PriceModel._add_derived_features(df)
         expected_age = CURRENT_YEAR - 2020
         expected = 60_000 / max(expected_age, 1)
@@ -386,7 +404,7 @@ class TestFeatureDerivation:
 
     def test_mileage_ratio(self):
         """_add_derived_features should compute mileage / (car_age * 15_000 + 1)."""
-        df = pd.DataFrame({"year": [2020], "mileage": [60_000]})
+        df = self._base_df(mileage=60_000)
         result = PriceModel._add_derived_features(df)
         expected_age = CURRENT_YEAR - 2020
         expected = 60_000 / (expected_age * 15_000 + 1)
@@ -394,10 +412,28 @@ class TestFeatureDerivation:
 
     def test_zero_age_no_division_error(self):
         """Year = CURRENT_YEAR => car_age = 0 => mileage_per_year uses clip(lower=1)."""
-        df = pd.DataFrame({"year": [CURRENT_YEAR], "mileage": [5000]})
+        df = self._base_df(year=CURRENT_YEAR, mileage=5000)
         result = PriceModel._add_derived_features(df)
         assert result["car_age"].iloc[0] == 0
         assert result["mileage_per_year"].iloc[0] == 5000.0
+
+    def test_is_premium_for_premium_brand(self):
+        """_add_derived_features should set is_premium=1 for BMW."""
+        df = self._base_df(brand="BMW")
+        result = PriceModel._add_derived_features(df)
+        assert result["is_premium"].iloc[0] == 1
+
+    def test_is_premium_for_regular_brand(self):
+        """_add_derived_features should set is_premium=0 for Toyota."""
+        df = self._base_df(brand="Toyota")
+        result = PriceModel._add_derived_features(df)
+        assert result["is_premium"].iloc[0] == 0
+
+    def test_power_per_liter(self):
+        """_add_derived_features should compute power_hp / engine_volume."""
+        df = self._base_df(engine_volume=2.0, power_hp=200)
+        result = PriceModel._add_derived_features(df)
+        assert abs(result["power_per_liter"].iloc[0] - 100.0) < 1e-9
 
     def test_prepare_data_adds_derived_columns(self):
         """PriceModel._prepare_data should produce all derived feature columns."""
@@ -405,7 +441,16 @@ class TestFeatureDerivation:
         model = PriceModel()
         prepared = model._prepare_data(df)
 
-        for col in ["car_age", "log_car_age", "log_mileage", "mileage_per_year", "mileage_ratio"]:
+        for col in [
+            "car_age",
+            "log_car_age",
+            "log_mileage",
+            "mileage_per_year",
+            "mileage_ratio",
+            "listing_month",
+            "is_premium",
+            "power_per_liter",
+        ]:
             assert col in prepared.columns, f"Missing derived column: {col}"
 
 

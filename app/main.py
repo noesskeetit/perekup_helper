@@ -197,6 +197,145 @@ async def api_stats():
     }
 
 
+@app.get("/api/price-estimate/{listing_id}")
+async def price_estimate(listing_id: str):
+    """Ensemble price estimate: CatBoost + comparable sales + Avito estimate.
+
+    Weights (all three available):  avito=0.5, comparable=0.3, catboost=0.2
+    Avito missing:                  comparable=0.5, catboost=0.5
+    Comparables < 3:                catboost=0.7, comparable=0.3
+    """
+    import uuid
+
+    from sqlalchemy import select
+
+    from app.db.session import async_session_factory
+    from app.models.listing import Listing
+    from app.services.comparable_sales import compute_comparable_price, find_comparables
+    from app.services.pricing import get_price_model
+
+    # 1. Fetch listing from DB
+    try:
+        lid = uuid.UUID(listing_id)
+    except ValueError:
+        return {"error": "invalid listing_id"}, 400
+
+    async with async_session_factory() as session:
+        stmt = select(Listing).where(Listing.id == lid)
+        result = await session.execute(stmt)
+        listing = result.scalar_one_or_none()
+
+    if listing is None:
+        return {"error": "listing not found"}
+
+    # 2. CatBoost prediction
+    model = get_price_model()
+    cb_input = {
+        "brand": listing.brand,
+        "model": listing.model,
+        "year": listing.year,
+        "mileage": listing.mileage or 0,
+        "price": listing.price,
+        "source": listing.source or "unknown",
+        "city": listing.city or "unknown",
+        "engine_type": listing.engine_type or "unknown",
+        "engine_volume": listing.engine_volume or 0.0,
+        "power_hp": listing.power_hp or 0,
+        "transmission": listing.transmission or "unknown",
+        "drive_type": listing.drive_type or "unknown",
+        "body_type": listing.body_type or "unknown",
+        "owners_count": listing.owners_count or 0,
+    }
+    cb_pred = model.predict_one(cb_input)
+    catboost_price = cb_pred["p50"]
+
+    # 3. Comparable sales (K=10, 60 days)
+    comps = await find_comparables(cb_input, k=10, max_age_days=60)
+    comp_stats = compute_comparable_price(comps)
+    comparable_price = comp_stats["median_price"]
+    comp_count = comp_stats["count"]
+
+    # 4. Avito estimate from raw_data
+    avito_estimate = None
+    if listing.raw_data and isinstance(listing.raw_data, dict):
+        avito_estimate = listing.raw_data.get("avito_estimate")
+
+    # 5. Ensemble price
+    ensemble_price = None
+    method = "none"
+
+    has_catboost = catboost_price is not None and model.is_trained
+    has_comparable = comparable_price is not None and comp_count >= 1
+    has_avito = avito_estimate is not None
+
+    if has_avito and has_comparable and comp_count >= 3 and has_catboost:
+        # All three available with enough comparables
+        ensemble_price = int(avito_estimate * 0.5 + comparable_price * 0.3 + catboost_price * 0.2)
+        method = "avito+comparable+catboost"
+    elif has_avito and has_catboost and (not has_comparable or comp_count < 3):
+        # Avito + catboost, weak/no comparables
+        ensemble_price = int(avito_estimate * 0.5 + catboost_price * 0.5)
+        method = "avito+catboost"
+    elif has_avito and has_comparable and comp_count >= 3:
+        # Avito + comparables, no catboost
+        ensemble_price = int(avito_estimate * 0.5 + comparable_price * 0.5)
+        method = "avito+comparable"
+    elif has_comparable and comp_count >= 3 and has_catboost:
+        # No avito, enough comparables
+        ensemble_price = int(comparable_price * 0.5 + catboost_price * 0.5)
+        method = "comparable+catboost"
+    elif has_comparable and comp_count < 3 and has_catboost:
+        # Few comparables, lean on catboost
+        ensemble_price = int(catboost_price * 0.7 + comparable_price * 0.3)
+        method = "catboost_heavy+comparable"
+    elif has_catboost:
+        ensemble_price = catboost_price
+        method = "catboost_only"
+    elif has_comparable:
+        ensemble_price = comparable_price
+        method = "comparable_only"
+    elif has_avito:
+        ensemble_price = avito_estimate
+        method = "avito_only"
+
+    # 6. Confidence score (0.0 - 1.0)
+    confidence = 0.0
+    if has_avito:
+        confidence += 0.4
+    if has_catboost:
+        confidence += 0.2
+    if comp_count >= 10:
+        confidence += 0.4
+    elif comp_count >= 3:
+        confidence += 0.2 + 0.2 * (comp_count - 3) / 7
+    elif comp_count >= 1:
+        confidence += 0.1
+    confidence = round(min(confidence, 1.0), 2)
+
+    return {
+        "listing_id": str(listing.id),
+        "actual_price": listing.price,
+        "estimates": {
+            "catboost": cb_pred if has_catboost else None,
+            "comparable": {
+                "median_price": comparable_price,
+                "p25_price": comp_stats["p25_price"],
+                "p75_price": comp_stats["p75_price"],
+                "count": comp_count,
+            }
+            if has_comparable
+            else None,
+            "avito": avito_estimate,
+        },
+        "ensemble": {
+            "price": ensemble_price,
+            "method": method,
+            "confidence": confidence,
+        },
+        "comparables_count": comp_count,
+    }
+
+
 @app.get("/api/model-info")
 async def model_info():
     """Get current price model metadata."""

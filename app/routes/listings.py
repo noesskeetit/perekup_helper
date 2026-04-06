@@ -36,7 +36,6 @@ SORT_COLUMNS = {
 
 async def _get_stats(session: AsyncSession) -> dict:
     """Compute all dashboard stats in a single query."""
-    from sqlalchemy import case, literal_column
 
     row = (
         await session.execute(
@@ -46,14 +45,14 @@ async def _get_stats(session: AsyncSession) -> dict:
                 func.count().filter(Listing.price_diff_pct > 15).label("hot_deals"),
                 func.avg(Listing.price_diff_pct).filter(Listing.price_diff_pct.isnot(None)).label("avg_diff"),
                 func.avg(Listing.price).label("avg_price"),
-            )
-            .where(Listing.is_duplicate.is_(False))
+            ).where(Listing.is_duplicate.is_(False))
         )
     ).one()
 
     model_info = None
     try:
         from app.services.pricing import get_price_model
+
         pm = get_price_model()
         if pm.is_trained:
             model_info = pm.get_info()

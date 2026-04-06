@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
 
 
 @dataclass
@@ -19,20 +18,20 @@ class ProxySplit:
 
 @dataclass
 class AvitoConfig:
-    urls: List[str]
-    proxy_string: Optional[str] = None
-    proxy_change_url: Optional[str] = None
-    keys_word_white_list: List[str] = field(default_factory=list)
-    keys_word_black_list: List[str] = field(default_factory=list)
-    seller_black_list: List[str] = field(default_factory=list)
+    urls: list[str]
+    proxy_string: str | None = None
+    proxy_change_url: str | None = None
+    keys_word_white_list: list[str] = field(default_factory=list)
+    keys_word_black_list: list[str] = field(default_factory=list)
+    seller_black_list: list[str] = field(default_factory=list)
     count: int = 1
-    tg_token: Optional[str] = None
-    tg_chat_id: List[str] = None
-    vk_token: Optional[str] = None
-    vk_user_id: List[str] = None
+    tg_token: str | None = None
+    tg_chat_id: list[str] = None
+    vk_token: str | None = None
+    vk_user_id: list[str] = None
     max_price: int = 999_999_999
     min_price: int = 0
-    geo: Optional[str] = None
+    geo: str | None = None
     max_age: int = 24 * 60 * 60
     debug_mode: int = 0
     pause_general: int = 60

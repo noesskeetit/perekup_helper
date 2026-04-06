@@ -4,58 +4,62 @@ tg_chat_id = []
 vk_token = ""
 vk_user_id = []
 urls = [
-    # Москва — крупнейший рынок
+    # Москва — массовые марки
     "https://www.avito.ru/moskva/avtomobili/toyota?cd=1&s=104",
     "https://www.avito.ru/moskva/avtomobili/hyundai?cd=1&s=104",
     "https://www.avito.ru/moskva/avtomobili/kia?cd=1&s=104",
-    "https://www.avito.ru/moskva/avtomobili/bmw?cd=1&s=104",
     "https://www.avito.ru/moskva/avtomobili/nissan?cd=1&s=104",
     "https://www.avito.ru/moskva/avtomobili/volkswagen?cd=1&s=104",
     "https://www.avito.ru/moskva/avtomobili/ford?cd=1&s=104",
     "https://www.avito.ru/moskva/avtomobili/renault?cd=1&s=104",
     "https://www.avito.ru/moskva/avtomobili/mazda?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/honda?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/mitsubishi?cd=1&s=104",
+    # Москва — премиум/тюнинг
+    "https://www.avito.ru/moskva/avtomobili/bmw?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/mercedes-benz?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/audi?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/lexus?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/infiniti?cd=1&s=104",
+    "https://www.avito.ru/moskva/avtomobili/subaru?cd=1&s=104",
+    # СПб — широкий набор
+    "https://www.avito.ru/sankt-peterburg/avtomobili/toyota?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/kia?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/bmw?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/mercedes-benz?cd=1&s=104",
+    "https://www.avito.ru/sankt-peterburg/avtomobili/volkswagen?cd=1&s=104",
     # Краснодар
     "https://www.avito.ru/krasnodar/avtomobili/toyota?cd=1&s=104",
     "https://www.avito.ru/krasnodar/avtomobili/vaz_lada?cd=1&s=104",
     "https://www.avito.ru/krasnodar/avtomobili/hyundai?cd=1&s=104",
     "https://www.avito.ru/krasnodar/avtomobili/kia?cd=1&s=104",
-    # СПб
-    "https://www.avito.ru/sankt-peterburg/avtomobili/toyota?cd=1&s=104",
-    "https://www.avito.ru/sankt-peterburg/avtomobili/hyundai?cd=1&s=104",
-    "https://www.avito.ru/sankt-peterburg/avtomobili/kia?cd=1&s=104",
-    "https://www.avito.ru/sankt-peterburg/avtomobili/volkswagen?cd=1&s=104",
-    # Самара
-    "https://www.avito.ru/samara/avtomobili/vaz_lada?cd=1&s=104",
-    "https://www.avito.ru/samara/avtomobili/toyota?cd=1&s=104",
-    "https://www.avito.ru/samara/avtomobili/hyundai?cd=1&s=104",
+    "https://www.avito.ru/krasnodar/avtomobili/bmw?cd=1&s=104",
     # Екатеринбург
     "https://www.avito.ru/ekaterinburg/avtomobili/toyota?cd=1&s=104",
     "https://www.avito.ru/ekaterinburg/avtomobili/vaz_lada?cd=1&s=104",
     "https://www.avito.ru/ekaterinburg/avtomobili/kia?cd=1&s=104",
+    "https://www.avito.ru/ekaterinburg/avtomobili/bmw?cd=1&s=104",
     # Казань
     "https://www.avito.ru/kazan/avtomobili/toyota?cd=1&s=104",
     "https://www.avito.ru/kazan/avtomobili/vaz_lada?cd=1&s=104",
     "https://www.avito.ru/kazan/avtomobili/hyundai?cd=1&s=104",
-    # Нижний Новгород
-    "https://www.avito.ru/nizhniy_novgorod/avtomobili/toyota?cd=1&s=104",
-    "https://www.avito.ru/nizhniy_novgorod/avtomobili/vaz_lada?cd=1&s=104",
-    # Новосибирск
+    # Новосибирск — тюнинг-культура
     "https://www.avito.ru/novosibirsk/avtomobili/toyota?cd=1&s=104",
-    "https://www.avito.ru/novosibirsk/avtomobili/hyundai?cd=1&s=104",
-    "https://www.avito.ru/novosibirsk/avtomobili/kia?cd=1&s=104",
+    "https://www.avito.ru/novosibirsk/avtomobili/nissan?cd=1&s=104",
+    "https://www.avito.ru/novosibirsk/avtomobili/subaru?cd=1&s=104",
+    "https://www.avito.ru/novosibirsk/avtomobili/honda?cd=1&s=104",
     # Ростов
     "https://www.avito.ru/rostov-na-donu/avtomobili/toyota?cd=1&s=104",
     "https://www.avito.ru/rostov-na-donu/avtomobili/vaz_lada?cd=1&s=104",
-    "https://www.avito.ru/rostov-na-donu/avtomobili/kia?cd=1&s=104",
-    # Воронеж
+    "https://www.avito.ru/rostov-na-donu/avtomobili/bmw?cd=1&s=104",
+    # Самара
+    "https://www.avito.ru/samara/avtomobili/vaz_lada?cd=1&s=104",
+    "https://www.avito.ru/samara/avtomobili/toyota?cd=1&s=104",
+    # Воронеж + Волгоград + Челябинск
     "https://www.avito.ru/voronezh/avtomobili/toyota?cd=1&s=104",
-    "https://www.avito.ru/voronezh/avtomobili/vaz_lada?cd=1&s=104",
-    # Волгоград
     "https://www.avito.ru/volgograd/avtomobili/toyota?cd=1&s=104",
-    "https://www.avito.ru/volgograd/avtomobili/hyundai?cd=1&s=104",
-    # Челябинск
     "https://www.avito.ru/chelyabinsk/avtomobili/toyota?cd=1&s=104",
-    "https://www.avito.ru/chelyabinsk/avtomobili/kia?cd=1&s=104",
 ]
 count = 3
 keys_word_white_list = []

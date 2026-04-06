@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import pickle
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -119,12 +119,12 @@ class PriceModel:
                 "mape": round(mape, 1),
             }
 
-        self._trained_at = datetime.now(timezone.utc)
+        self._trained_at = datetime.now(UTC)
         self._training_size = len(df)
 
         # Feature importance (from P50 model)
         importance = self._models[0.50].get_feature_importance()
-        feature_imp = dict(zip(self._feature_names, importance))
+        feature_imp = dict(zip(self._feature_names, importance, strict=False))
         stats["feature_importance"] = {k: round(v, 1) for k, v in sorted(feature_imp.items(), key=lambda x: -x[1])}
         stats["trained_at"] = self._trained_at.isoformat()
 
@@ -160,17 +160,16 @@ class PriceModel:
 
             # Price vs market (P50)
             actual_price = listings[i].get("price", 0)
-            if p50 > 0 and actual_price > 0:
-                pct = round((1.0 - actual_price / p50) * 100, 1)
-            else:
-                pct = None
+            pct = round((1.0 - actual_price / p50) * 100, 1) if p50 > 0 and actual_price > 0 else None
 
-            results.append({
-                "p10": p10,
-                "p50": p50,
-                "p90": p90,
-                "price_vs_market_pct": pct,
-            })
+            results.append(
+                {
+                    "p10": p10,
+                    "p50": p50,
+                    "p90": p90,
+                    "price_vs_market_pct": pct,
+                }
+            )
 
         return results
 
@@ -215,7 +214,9 @@ class PriceModel:
                     self._trained_at = meta.get("trained_at")
                     self._training_size = meta.get("training_size", 0)
 
-            logger.info("Price model loaded: %d quantile models, trained on %d samples", len(self._models), self._training_size)
+            logger.info(
+                "Price model loaded: %d quantile models, trained on %d samples", len(self._models), self._training_size
+            )
             return True
         except Exception:
             logger.exception("Failed to load price model")

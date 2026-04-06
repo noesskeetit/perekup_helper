@@ -1,8 +1,7 @@
-from typing import List
-
-from loguru import logger
 
 from dto import AvitoConfig
+from loguru import logger
+
 from models import Item
 
 
@@ -11,7 +10,7 @@ class AdsFilter:
         self.config = config
         self.is_viewed_fn = is_viewed_fn
 
-    def apply(self, ads: List[Item]) -> List[Item]:
+    def apply(self, ads: list[Item]) -> list[Item]:
         """Применяет все фильтры по порядку"""
         filters = [
             self._filter_viewed,
@@ -32,12 +31,12 @@ class AdsFilter:
                 return ads
         return ads
 
-    def _filter_viewed(self, ads: List[Item]) -> List[Item]:
+    def _filter_viewed(self, ads: list[Item]) -> list[Item]:
         if self.is_viewed_fn:
             return [ad for ad in ads if not self.is_viewed_fn(ad)]
         return ads
 
-    def _filter_by_price_range(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_price_range(self, ads: list[Item]) -> list[Item]:
         if not self.config.min_price and not self.config.max_price:
             return ads
         try:
@@ -45,27 +44,27 @@ class AdsFilter:
         except Exception:
             return ads
 
-    def _filter_by_black_keywords(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_black_keywords(self, ads: list[Item]) -> list[Item]:
         if not self.config.keys_word_black_list:
             return ads
         return [ad for ad in ads if not self._is_phrase_in_ads(ad, self.config.keys_word_black_list)]
 
-    def _filter_by_white_keyword(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_white_keyword(self, ads: list[Item]) -> list[Item]:
         if not self.config.keys_word_white_list:
             return ads
         return [ad for ad in ads if self._is_phrase_in_ads(ad, self.config.keys_word_white_list)]
 
-    def _filter_by_address(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_address(self, ads: list[Item]) -> list[Item]:
         if not self.config.geo:
             return ads
         return [ad for ad in ads if self.config.geo in getattr(ad, "geo", {}).get("formattedAddress", "")]
 
-    def _filter_by_seller(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_seller(self, ads: list[Item]) -> list[Item]:
         if not self.config.seller_black_list:
             return ads
         return [ad for ad in ads if not getattr(ad, "sellerId", None) or ad.sellerId not in self.config.seller_black_list]
 
-    def _filter_by_recent_time(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_recent_time(self, ads: list[Item]) -> list[Item]:
         if not self.config.max_age:
             return ads
         from datetime import datetime, timedelta
@@ -77,12 +76,12 @@ class AdsFilter:
                 filtered.append(ad)
         return filtered
 
-    def _filter_by_reserve(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_reserve(self, ads: list[Item]) -> list[Item]:
         if not self.config.ignore_reserv:
             return ads
         return [ad for ad in ads if not getattr(ad, "isReserved", False)]
 
-    def _filter_by_promotion(self, ads: List[Item]) -> List[Item]:
+    def _filter_by_promotion(self, ads: list[Item]) -> list[Item]:
         if not self.config.ignore_promotion:
             return ads
         for ad in ads:

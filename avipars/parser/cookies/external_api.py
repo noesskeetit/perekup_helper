@@ -4,7 +4,6 @@ from pathlib import Path
 
 import requests
 from loguru import logger
-
 from parser.cookies.base import CookiesProvider
 
 API_URL = "https://spfa.ru/api"

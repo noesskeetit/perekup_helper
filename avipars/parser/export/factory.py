@@ -1,10 +1,11 @@
 from datetime import datetime
 from pathlib import Path
+
 from dto import AvitoConfig
 
 from parser.export.base import ResultStorage
-from parser.export.excel import ExcelStorage
 from parser.export.composite import CompositeResultStorage, NullResultStorage
+from parser.export.excel import ExcelStorage
 
 
 def build_result_storage(

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
 from app.db.session import async_session_factory
-from app.models.listing import Listing as DBListing, ListingAnalysis
+from app.models.listing import Listing as DBListing
+from app.models.listing import ListingAnalysis
 from bot.services.checker import Listing
 
 
@@ -24,8 +25,8 @@ class DatabaseChecker:
         self._last_check: datetime | None = None
 
     async def fetch_new(self) -> Sequence[Listing]:
-        cutoff = self._last_check or (datetime.now(timezone.utc) - timedelta(minutes=self._lookback_minutes))
-        self._last_check = datetime.now(timezone.utc)
+        cutoff = self._last_check or (datetime.now(UTC) - timedelta(minutes=self._lookback_minutes))
+        self._last_check = datetime.now(UTC)
 
         async with async_session_factory() as session:
             stmt = (

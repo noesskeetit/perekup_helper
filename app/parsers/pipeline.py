@@ -78,7 +78,7 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
             pr = await ingest_listings(listings, source)
             pr.elapsed_seconds = elapsed
             # Extract captcha count from parser if available
-            if hasattr(parser, '_last_captcha_count'):
+            if hasattr(parser, "_last_captcha_count"):
                 pr.captchas_hit = parser._last_captcha_count
             return pr
         except Exception as exc:
@@ -127,7 +127,8 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
             result.total_analyzed = pool_result["analyzed"]
             logger.info(
                 "Pipeline: analyzed %d listings via %d workers",
-                pool_result["analyzed"], pool_result["workers"],
+                pool_result["analyzed"],
+                pool_result["workers"],
             )
         except Exception as exc:
             logger.exception("Pipeline: analysis failed")
@@ -139,8 +140,13 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
         lpb_str = f"{lpb:.0f}" if lpb is not None else "inf"
         logger.info(
             "Pipeline [%s]: fetched=%d, new=%d, dupes=%d, time=%.1fs, captchas=%d, listings/ban=%s",
-            pr.source, pr.total_fetched, pr.new_saved, pr.duplicates_skipped,
-            pr.elapsed_seconds, pr.captchas_hit, lpb_str,
+            pr.source,
+            pr.total_fetched,
+            pr.new_saved,
+            pr.duplicates_skipped,
+            pr.elapsed_seconds,
+            pr.captchas_hit,
+            lpb_str,
         )
 
     logger.info(

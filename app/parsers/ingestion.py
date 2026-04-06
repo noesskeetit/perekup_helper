@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import async_session_factory
 from app.models.listing import Listing
@@ -23,10 +22,10 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
         return result
 
     # Normalize all listings
-    listings = [normalize_listing(l) for l in listings]
+    listings = [normalize_listing(item) for item in listings]
 
     async with async_session_factory() as session:
-        external_ids = [l.external_id for l in listings]
+        external_ids = [item.external_id for item in listings]
         stmt = select(Listing.external_id).where(
             Listing.source == source,
             Listing.external_id.in_(external_ids),
@@ -96,7 +95,9 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
                         result.errors += 1
                 result.new_saved = saved
                 if result.errors:
-                    logger.warning("Ingested %d/%d %s listings (%d failed)", saved, len(new_listings), source, result.errors)
+                    logger.warning(
+                        "Ingested %d/%d %s listings (%d failed)", saved, len(new_listings), source, result.errors
+                    )
 
             if result.new_saved:
                 logger.info(

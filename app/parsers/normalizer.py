@@ -11,8 +11,8 @@ from enum import Enum
 
 from app.parsers.base import ParsedListing
 
-
 # ── Canonical enums ──────────────────────────────────────────────────────────
+
 
 class EngineType(str, Enum):
     PETROL = "бензин"
@@ -301,6 +301,7 @@ DROM_CITY_MAP: dict[str, str] = {
 
 
 # ── Normalization functions ──────────────────────────────────────────────────
+
 
 def _norm(value: str | None, mapping: dict[str, str]) -> str | None:
     """Normalize a value using a case-insensitive mapping."""

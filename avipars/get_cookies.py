@@ -1,13 +1,12 @@
 import asyncio
 import random
+
 import httpx
+from dto import Proxy, ProxySplit
 from loguru import logger
 from playwright.async_api import async_playwright
-from playwright_stealth import Stealth
-from typing import Optional, Dict, List
-
-from dto import Proxy, ProxySplit
 from playwright_setup import ensure_playwright_installed
+from playwright_stealth import Stealth
 
 MAX_RETRIES = 3
 RETRY_DELAY = 10
@@ -20,7 +19,7 @@ class PlaywrightClient:
             self,
             proxy: Proxy = None,
             headless: bool = True,
-            user_agent: Optional[str] = None,
+            user_agent: str | None = None,
             stop_event=None
     ):
         self.proxy = proxy

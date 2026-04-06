@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from parser.export.naming.base import ResultNamingStrategy
 
+
 class PerLinkNamingStrategy(ResultNamingStrategy):
     def __init__(self, base_dir: str = "result"):
         self.base_dir = base_dir

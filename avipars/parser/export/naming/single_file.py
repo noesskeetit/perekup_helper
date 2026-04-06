@@ -1,5 +1,6 @@
+
 from parser.export.naming.base import ResultNamingStrategy
-from pathlib import Path
+
 
 class SingleFileNamingStrategy(ResultNamingStrategy):
     def __init__(self, path: str):

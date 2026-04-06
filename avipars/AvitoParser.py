@@ -1,16 +1,15 @@
 import asyncio
+import os
 import threading
 import time
-import os
 from pathlib import Path
 
 import flet as ft
-from loguru import logger
-
 from dto import AvitoConfig
 from integrations.notifications.factory import build_notifier
 from lang import *
-from load_config import save_avito_config, load_avito_config
+from load_config import load_avito_config, save_avito_config
+from loguru import logger
 from parser_cls import AvitoParse
 from utils import prompt_user_login
 

@@ -7,7 +7,6 @@ import logging
 import os
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import async_session_factory
 from app.models.listing import AnalysisCategory, Listing, ListingAnalysis
@@ -77,10 +76,7 @@ async def analyze_new_listings(limit: int = 50) -> int:
 
         score_results = []
         try:
-            use_cloudru = (
-                settings.ai_provider == "cloudru"
-                and settings.cloudru_fm_api_key
-            )
+            use_cloudru = settings.ai_provider == "cloudru" and settings.cloudru_fm_api_key
             if use_cloudru:
                 from perekup_helper.cloudru_client import CloudRuCategorizer
 
@@ -102,7 +98,7 @@ async def analyze_new_listings(limit: int = 50) -> int:
             return 0
 
         # Save results
-        listing_map = {str(l.id): l for l in listings}
+        listing_map = {str(item.id): item for item in listings}
         analyzed_count = 0
 
         for sr in score_results:
@@ -145,9 +141,11 @@ async def analyze_new_listings(limit: int = 50) -> int:
                 try:
                     async with async_session_factory() as retry_session:
                         # Check if already exists
-                        existing = (await retry_session.execute(
-                            select(ListingAnalysis).where(ListingAnalysis.listing_id == listing.id)
-                        )).scalar_one_or_none()
+                        existing = (
+                            await retry_session.execute(
+                                select(ListingAnalysis).where(ListingAnalysis.listing_id == listing.id)
+                            )
+                        ).scalar_one_or_none()
                         if existing:
                             continue
                         analysis = ListingAnalysis(

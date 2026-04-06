@@ -5,7 +5,6 @@ Commits in batches for reliability.
 """
 
 import asyncio
-import os
 import sys
 import time
 
@@ -20,16 +19,16 @@ async def main():
     from dotenv import load_dotenv
     load_dotenv()
 
-    from sqlalchemy import select, func
+    from load_config import load_avito_config
+    from parser.cookies.factory import build_cookies_provider
+    from parser.http.client import HttpClient
+    from parser.proxies.proxy_factory import build_proxy
+    from sqlalchemy import select
+
     from app.db.session import async_session_factory, engine
     from app.models.listing import Listing
     from app.parsers.avito_detail import enrich_listing_from_detail
     from app.parsers.base import ParsedListing
-
-    from load_config import load_avito_config
-    from parser.cookies.factory import build_cookies_provider
-    from parser.proxies.proxy_factory import build_proxy
-    from parser.http.client import HttpClient
 
     config = load_avito_config("avipars/config.toml")
     proxy = build_proxy(config)

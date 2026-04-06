@@ -1,7 +1,7 @@
 from dto import AvitoConfig
-
-from parser.export.naming.single_file import SingleFileNamingStrategy
 from parser.export.naming.per_link import PerLinkNamingStrategy
+from parser.export.naming.single_file import SingleFileNamingStrategy
+
 
 def build_naming_strategy(config: AvitoConfig):
     """Строит стратегию именования результатов на основе конфига"""

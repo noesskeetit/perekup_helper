@@ -44,7 +44,9 @@ CATEGORIZE_PROMPT = """\
 Объявление:
 {text}"""
 
-DESCRIBE_IMAGE_PROMPT = "Опиши автомобиль на фото кратко: состояние кузова, видимые повреждения, цвет, тип кузова. 2-3 предложения."
+DESCRIBE_IMAGE_PROMPT = (
+    "Опиши автомобиль на фото кратко: состояние кузова, видимые повреждения, цвет, тип кузова. 2-3 предложения."
+)
 
 
 class CloudRuCategorizer:
@@ -179,7 +181,7 @@ class CloudRuCategorizer:
                 cleaned = match.group(1).strip()
         elif cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
 
         # Try direct parse first

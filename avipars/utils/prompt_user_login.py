@@ -1,9 +1,10 @@
 import asyncio
 import json
-from playwright.async_api import async_playwright, Playwright
-from loguru import logger
-from playwright_setup import ensure_playwright_installed
 from pathlib import Path
+
+from loguru import logger
+from playwright.async_api import Playwright, async_playwright
+from playwright_setup import ensure_playwright_installed
 
 logger.add("logs/app.log", rotation="5 MB", retention="5 days", level="DEBUG")
 

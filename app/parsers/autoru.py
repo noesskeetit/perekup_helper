@@ -50,6 +50,13 @@ DEFAULT_SEARCHES = [
     {"url": "https://auto.ru/cars/nissan/used/?geo_id=213&price_from=100000&price_to=1500000"},
     {"url": "https://auto.ru/cars/mazda/used/?geo_id=213&price_from=100000&price_to=1500000"},
     {"url": "https://auto.ru/cars/volkswagen/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    # Moscow — premium/tuning
+    {"url": "https://auto.ru/cars/bmw/used/?geo_id=213&price_from=200000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/mercedes/used/?geo_id=213&price_from=200000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/audi/used/?geo_id=213&price_from=200000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/lexus/used/?geo_id=213&price_from=300000&price_to=3000000"},
+    {"url": "https://auto.ru/cars/subaru/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    {"url": "https://auto.ru/cars/honda/used/?geo_id=213&price_from=100000&price_to=1500000"},
     # Krasnodar (35)
     {"url": "https://auto.ru/cars/toyota/used/?geo_id=35&price_from=100000&price_to=2000000"},
     {"url": "https://auto.ru/cars/vaz/used/?geo_id=35&price_from=100000&price_to=1000000"},
@@ -87,9 +94,6 @@ class AutoruParser(BaseParser):
         self._pause_range = pause_range
 
     async def fetch_listings(self) -> list[ParsedListing]:
-        all_listings: list[ParsedListing] = []
-        seen_ids: set[str] = set()
-
         try:
             from curl_cffi import requests as cffi_requests
         except ImportError:
@@ -133,8 +137,11 @@ class AutoruParser(BaseParser):
                     # Check for captcha — change IP and skip to next search URL
                     if "captcha.auto.ru" in str(resp.url) or resp.status_code == 403:
                         captcha_count += 1
-                        logger.warning("Auto.ru: captcha #%d triggered on %s, changing IP and skipping to next search",
-                                       captcha_count, base_url)
+                        logger.warning(
+                            "Auto.ru: captcha #%d triggered on %s, changing IP and skipping to next search",
+                            captcha_count,
+                            base_url,
+                        )
                         self._try_change_ip()
                         time.sleep(5)
                         break  # Skip to next search URL, not stopping entirely
@@ -228,15 +235,19 @@ class AutoruParser(BaseParser):
         """Attempt to rotate proxy IP via the proxy manager."""
         try:
             from app.parsers.proxy_manager import change_ip
+
             change_ip()
         except Exception:
             logger.debug("Auto.ru: IP change failed", exc_info=True)
 
     def _extract_offers(self, html: str) -> list[ParsedListing]:
         """Extract offers from Auto.ru HTML via regex."""
-        logger.info("Auto.ru: extracting from %d bytes, has mark_info=%s, listing_urls=%d",
-                     len(html), "mark_info" in html,
-                     html.count("auto.ru/cars/used/sale/"))
+        logger.info(
+            "Auto.ru: extracting from %d bytes, has mark_info=%s, listing_urls=%d",
+            len(html),
+            "mark_info" in html,
+            html.count("auto.ru/cars/used/sale/"),
+        )
         return self._extract_offers_regex(html)
 
     def _extract_offers_regex(self, html: str) -> list[ParsedListing]:

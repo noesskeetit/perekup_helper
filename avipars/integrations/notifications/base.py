@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from integrations.notifications.utils import escape_markdown_v2, get_price
+
 from models import Item
 
 

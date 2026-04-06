@@ -3,12 +3,11 @@
 """
 
 import time
+
 from curl_cffi import requests
 from loguru import logger
-
 from parser.cookies.base import CookiesProvider
 from parser.proxies.proxy import Proxy
-
 
 HEADERS = {
     "sec-ch-ua-platform": '"Windows"',

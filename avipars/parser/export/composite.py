@@ -1,7 +1,8 @@
 from loguru import logger
 
-from parser.export.base import ResultStorage
 from models import Item
+from parser.export.base import ResultStorage
+
 
 class CompositeResultStorage(ResultStorage):
     """

@@ -1,10 +1,8 @@
 import json
 import time
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
-
 from parser.cookies.base import CookiesProvider
 
 
@@ -86,7 +84,7 @@ class OwnCookiesProvider(CookiesProvider):
         time.sleep(self.UNBLOCK_TIMEOUT)
 
     @staticmethod
-    def _extract_cookies_from_response(response) -> Optional[dict]:
+    def _extract_cookies_from_response(response) -> dict | None:
         """
         Извлекает cookies из response в зависимости от его типа
         """
@@ -134,7 +132,7 @@ class OwnCookiesProvider(CookiesProvider):
             self.last_cookies = data.get("cookies")
 
             if self.last_cookies:
-                logger.info(f"📂 Загружены собственные cookies с диска")
+                logger.info("📂 Загружены собственные cookies с диска")
             else:
                 logger.warning("Cookies файл есть, но нет cookies в нем")
 

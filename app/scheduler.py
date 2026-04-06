@@ -33,7 +33,7 @@ async def _parse_job() -> None:
 
 async def _retrain_price_model_job() -> None:
     """Retrain CatBoost price model on all collected data."""
-    from app.services.pricing_trainer import train_model, score_listings
+    from app.services.pricing_trainer import score_listings, train_model
 
     logger.info("Scheduler: retraining price model")
     try:

@@ -202,9 +202,8 @@ def _parse_engine(listing: ParsedListing, raw: str) -> None:
 
         # Fuel type
         fuel_lower = part.lower().strip()
-        if fuel_lower in ("бензин", "дизель", "гибрид", "электро", "газ"):
-            if listing.engine_type is None:
-                listing.engine_type = part.strip()
+        if fuel_lower in ("бензин", "дизель", "гибрид", "электро", "газ") and listing.engine_type is None:
+            listing.engine_type = part.strip()
 
 
 def _parse_int(text: str) -> int | None:

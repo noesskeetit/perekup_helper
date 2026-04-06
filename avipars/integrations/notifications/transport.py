@@ -2,7 +2,7 @@
 Клиент для уведомлений, для парсера есть свой отдельный
 """
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import requests
 from loguru import logger

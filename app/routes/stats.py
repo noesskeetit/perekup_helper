@@ -65,24 +65,18 @@ async def stats_page(
     ]
 
     # Coverage metrics
-    priced_result = await session.execute(
-        select(func.count(Listing.id)).where(Listing.market_price.isnot(None))
-    )
+    priced_result = await session.execute(select(func.count(Listing.id)).where(Listing.market_price.isnot(None)))
     total_priced = priced_result.scalar() or 0
 
     analyzed_result = await session.execute(select(func.count(ListingAnalysis.id)))
     total_analyzed = analyzed_result.scalar() or 0
 
     hot_deals_result = await session.execute(
-        select(func.count(Listing.id)).where(
-            Listing.price_diff_pct > 15, Listing.is_duplicate.is_(False)
-        )
+        select(func.count(Listing.id)).where(Listing.price_diff_pct > 15, Listing.is_duplicate.is_(False))
     )
     hot_deals = hot_deals_result.scalar() or 0
 
-    dupes_result = await session.execute(
-        select(func.count(Listing.id)).where(Listing.is_duplicate.is_(True))
-    )
+    dupes_result = await session.execute(select(func.count(Listing.id)).where(Listing.is_duplicate.is_(True)))
     total_dupes = dupes_result.scalar() or 0
 
     ctx = {

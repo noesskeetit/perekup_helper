@@ -54,6 +54,12 @@ DEFAULT_URLS = [
     "https://moscow.drom.ru/mazda/?minprice=100000&maxprice=1500000",
     "https://moscow.drom.ru/honda/?minprice=100000&maxprice=1500000",
     "https://moscow.drom.ru/mitsubishi/?minprice=100000&maxprice=1500000",
+    # Moscow — premium/tuning
+    "https://moscow.drom.ru/mercedes-benz/?minprice=200000&maxprice=2000000",
+    "https://moscow.drom.ru/audi/?minprice=200000&maxprice=2000000",
+    "https://moscow.drom.ru/lexus/?minprice=300000&maxprice=3000000",
+    "https://moscow.drom.ru/infiniti/?minprice=200000&maxprice=2000000",
+    "https://moscow.drom.ru/subaru/?minprice=100000&maxprice=1500000",
     # Krasnodar
     "https://krasnodar.drom.ru/toyota/?minprice=100000&maxprice=2000000",
     "https://krasnodar.drom.ru/lada/?minprice=100000&maxprice=1000000",
@@ -266,7 +272,9 @@ class DromParser(BaseParser):
         if specs is None:
             specs = {}
 
-        brand = data.get("brand", {}).get("name", "") if isinstance(data.get("brand"), dict) else str(data.get("brand", ""))
+        brand = (
+            data.get("brand", {}).get("name", "") if isinstance(data.get("brand"), dict) else str(data.get("brand", ""))
+        )
         model = str(data.get("model", ""))
         year = int(data.get("vehicleModelDate", 0) or 0)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -18,7 +19,6 @@ from perekup_helper.categorizer import (
     _compute_price_ratio,
 )
 from perekup_helper.models import (
-    CarCategory,
     CategoryResult,
     ListingDescription,
     ScoreResult,
@@ -204,17 +204,15 @@ class BatchProcessor:
             # Try to find JSON array in the text
             array_match = re.search(r"\[.*\]", cleaned, re.DOTALL)
             if array_match:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     data = json.loads(array_match.group())
-                except json.JSONDecodeError:
-                    pass
 
         if data is None:
             logger.error(
                 "Failed to parse batch response. Raw (first 500 chars): %s",
                 raw[:500],
             )
-            raise ValueError(f"Невалидный batch JSON")
+            raise ValueError("Невалидный batch JSON")
 
         if not isinstance(data, list):
             raise ValueError("Ожидался JSON-массив в batch-ответе")

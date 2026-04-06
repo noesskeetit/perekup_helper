@@ -1,7 +1,7 @@
+from dto import AvitoConfig
 from loguru import logger
 
-from dto import AvitoConfig
-from .proxy import NoProxy, ServerProxy, MobileProxy, Proxy
+from .proxy import MobileProxy, NoProxy, Proxy, ServerProxy
 
 
 def build_proxy(config: AvitoConfig) -> Proxy:

@@ -9,7 +9,7 @@ class SQLiteDBHandler:
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(SQLiteDBHandler, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self, db_name="database.db"):

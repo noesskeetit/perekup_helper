@@ -1,9 +1,9 @@
 import requests
-from loguru import logger
-
 from integrations.notifications.base import Notifier
 from integrations.notifications.transport import send_with_retries
 from integrations.notifications.utils import get_first_image
+from loguru import logger
+
 from models import Item
 
 
@@ -73,7 +73,7 @@ class VKNotifier(Notifier):
             logger.warning(f"VK API error {error_code}: {error_msg}")
             return
 
-        logger.debug(f"Сообщение успешно отправлено")
+        logger.debug("Сообщение успешно отправлено")
 
     def notify(self, ad: Item = None, message: str = None):
         if ad:

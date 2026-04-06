@@ -1,5 +1,6 @@
+from typing import Any
+
 from pydantic import BaseModel, HttpUrl, RootModel
-from typing import List, Optional, Dict, Any
 
 
 class Category(BaseModel):
@@ -29,8 +30,8 @@ class PriceDetailed(BaseModel):
     hasValue: bool
     postfix: str
     string: str
-    stringWithoutDiscount: Optional[str]
-    title: Dict[str, str]
+    stringWithoutDiscount: str | None
+    title: dict[str, str]
     titleDative: str
     value: int
     wasLowered: bool
@@ -38,11 +39,11 @@ class PriceDetailed(BaseModel):
 
 
 class Image(RootModel):
-    root: Dict[str, HttpUrl]
+    root: dict[str, HttpUrl]
 
 
 class Geo(BaseModel):
-    geoReferences: List[Any]
+    geoReferences: list[Any]
     formattedAddress: str
 
 
@@ -60,8 +61,8 @@ class Contacts(BaseModel):
 
 class Gallery(BaseModel):
     alt: str | None = None
-    cropImagesInfo: Optional[Any]
-    extraPhoto: Optional[Any]
+    cropImagesInfo: Any | None
+    extraPhoto: Any | None
     hasLeadgenOverlay: bool
     has_big_image: bool
     imageAlt: str
@@ -69,31 +70,31 @@ class Gallery(BaseModel):
     imageLargeVipUrl: str
     imageUrl: str
     imageVipUrl: str
-    image_large_urls: List[Any]
-    image_urls: List[Any]
-    images: List[Any]
+    image_large_urls: list[Any]
+    image_urls: list[Any]
+    images: list[Any]
     imagesCount: int
     isFirstImageHighImportance: bool
     isLazy: bool
     noPhoto: bool
     showSlider: bool
-    wideSnippetUrls: List[Any]
+    wideSnippetUrls: list[Any]
 
 
 class UserLogo(BaseModel):
     link: str | None = None
     src: HttpUrl | str | None = None
-    developerId: Optional[int]
+    developerId: int | None
 
 
 class IvaComponent(BaseModel):
     component: str
-    payload: Optional[Dict[str, Any]] = None
+    payload: dict[str, Any] | None = None
 
 
 class IvaStep(BaseModel):
     componentData: IvaComponent
-    payload: Optional[Dict[str, Any]] = None
+    payload: dict[str, Any] | None = None
     default: bool
 
 
@@ -111,16 +112,16 @@ class Item(BaseModel):
     sortTimeStamp: int | None = None
     turnOffDate: bool | None = None
     priceDetailed: PriceDetailed | None = None
-    normalizedPrice: Optional[str] | None = None
-    priceWithoutDiscount: Optional[str] | None = None
-    discountPercent: Optional[int] | Optional[str] | None = None
-    lastMinuteOffer: Optional[str] | Optional[dict] | None = None
-    images: List[Image] | None = None
+    normalizedPrice: str | None | None = None
+    priceWithoutDiscount: str | None | None = None
+    discountPercent: int | None | str | None | None = None
+    lastMinuteOffer: str | None | dict | None | None = None
+    images: list[Image] | None = None
     imagesCount: int | None = None
     isFavorite: bool | None = None
     isNew: bool | None = None
     geo: Geo | None = None
-    phoneImage: Optional[str] | None = None
+    phoneImage: str | None | None = None
     cvViewed: bool | None = None
     isXl: bool | None = None
     hasFooter: bool | None = None
@@ -130,11 +131,11 @@ class Item(BaseModel):
     authLink: str | None = None
     userLogo: UserLogo | None = None
     isMarketplace: bool | None = None
-    iva: Dict[str, List[IvaStep]] | None = None
+    iva: dict[str, list[IvaStep]] | None = None
     hasVideo: bool | None = None
     hasRealtyLayout: bool | None = None
-    coords: Dict[str, Any] | None = None
-    groupData: Optional[Any] | None = None
+    coords: dict[str, Any] | None = None
+    groupData: Any | None | None = None
     isReMapPromotion: bool | None = None
     isReserved: bool | None = None
     type: str | None = None
@@ -151,4 +152,4 @@ class Item(BaseModel):
 
 
 class ItemsResponse(BaseModel):
-    items: List[Item]
+    items: list[Item]

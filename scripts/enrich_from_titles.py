@@ -40,6 +40,7 @@ def parse_title(title: str) -> dict:
 
 async def main():
     from sqlalchemy import select
+
     from app.db.session import async_session_factory, engine
     from app.models.listing import Listing
 

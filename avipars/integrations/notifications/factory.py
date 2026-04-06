@@ -1,6 +1,6 @@
 from dto import AvitoConfig
 from integrations.notifications.base import Notifier
-from integrations.notifications.composite import NullNotifier, CompositeNotifier
+from integrations.notifications.composite import CompositeNotifier, NullNotifier
 from integrations.notifications.telegram import TelegramNotifier
 from integrations.notifications.vk import VKNotifier
 

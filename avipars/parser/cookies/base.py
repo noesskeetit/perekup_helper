@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict
 
 import httpx
 
@@ -7,7 +6,7 @@ import httpx
 class CookiesProvider(ABC):
 
     @abstractmethod
-    def get(self) -> Dict[str, str]:
+    def get(self) -> dict[str, str]:
         pass
 
     def update(self, response: httpx.Response) -> None:

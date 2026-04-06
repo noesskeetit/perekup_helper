@@ -9,12 +9,11 @@ from __future__ import annotations
 import logging
 
 import pandas as pd
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.session import async_session_factory
 from app.models.listing import Listing
-from app.services.pricing import PriceModel, get_price_model
+from app.services.pricing import get_price_model
 
 logger = logging.getLogger(__name__)
 
@@ -39,23 +38,25 @@ async def train_model() -> dict:
     # Build DataFrame
     records = []
     for row in listings:
-        records.append({
-            "id": str(row.id),
-            "brand": row.brand or "unknown",
-            "model": row.model or "unknown",
-            "year": row.year or 2020,
-            "mileage": row.mileage or 0,
-            "price": row.price,
-            "source": row.source or "unknown",
-            "city": row.city or "unknown",
-            "engine_type": row.engine_type or "unknown",
-            "transmission": row.transmission or "unknown",
-            "drive_type": row.drive_type or "unknown",
-            "body_type": row.body_type or "unknown",
-            "engine_volume": row.engine_volume or 0.0,
-            "power_hp": row.power_hp or 0,
-            "owners_count": row.owners_count or 0,
-        })
+        records.append(
+            {
+                "id": str(row.id),
+                "brand": row.brand or "unknown",
+                "model": row.model or "unknown",
+                "year": row.year or 2020,
+                "mileage": row.mileage or 0,
+                "price": row.price,
+                "source": row.source or "unknown",
+                "city": row.city or "unknown",
+                "engine_type": row.engine_type or "unknown",
+                "transmission": row.transmission or "unknown",
+                "drive_type": row.drive_type or "unknown",
+                "body_type": row.body_type or "unknown",
+                "engine_volume": row.engine_volume or 0.0,
+                "power_hp": row.power_hp or 0,
+                "owners_count": row.owners_count or 0,
+            }
+        )
 
     df = pd.DataFrame(records)
     logger.info("Training price model on %d listings", len(df))
@@ -99,29 +100,31 @@ async def score_listings(limit: int = 500) -> int:
         # Prepare features
         feature_dicts = []
         for listing in listings:
-            feature_dicts.append({
-                "brand": listing.brand or "unknown",
-                "model": listing.model or "unknown",
-                "year": listing.year or 2020,
-                "mileage": listing.mileage or 0,
-                "price": listing.price,
-                "source": listing.source or "unknown",
-                "city": listing.city or "unknown",
-                "engine_type": listing.engine_type or "unknown",
-                "transmission": listing.transmission or "unknown",
-                "drive_type": listing.drive_type or "unknown",
-                "body_type": listing.body_type or "unknown",
-                "engine_volume": listing.engine_volume or 0.0,
-                "power_hp": listing.power_hp or 0,
-                "owners_count": listing.owners_count or 0,
-            })
+            feature_dicts.append(
+                {
+                    "brand": listing.brand or "unknown",
+                    "model": listing.model or "unknown",
+                    "year": listing.year or 2020,
+                    "mileage": listing.mileage or 0,
+                    "price": listing.price,
+                    "source": listing.source or "unknown",
+                    "city": listing.city or "unknown",
+                    "engine_type": listing.engine_type or "unknown",
+                    "transmission": listing.transmission or "unknown",
+                    "drive_type": listing.drive_type or "unknown",
+                    "body_type": listing.body_type or "unknown",
+                    "engine_volume": listing.engine_volume or 0.0,
+                    "power_hp": listing.power_hp or 0,
+                    "owners_count": listing.owners_count or 0,
+                }
+            )
 
         # Predict
         predictions = model.predict(feature_dicts)
 
         # Update DB
         scored = 0
-        for listing, pred in zip(listings, predictions):
+        for listing, pred in zip(listings, predictions, strict=False):
             p50 = pred["p50"]
             pct = pred["price_vs_market_pct"]
 

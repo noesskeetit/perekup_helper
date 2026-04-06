@@ -69,7 +69,13 @@ class AvitoParser(BaseParser):
 
     source_name = "avito"
 
-    def __init__(self, config_path: str = "avipars/config.toml", fetch_details: bool = True, detail_pause: float = 0.5, detail_concurrency: int = 3):
+    def __init__(
+        self,
+        config_path: str = "avipars/config.toml",
+        fetch_details: bool = True,
+        detail_pause: float = 0.5,
+        detail_concurrency: int = 3,
+    ):
         self._config_path = config_path
         self._fetch_details = fetch_details
         self._detail_pause = detail_pause
@@ -86,6 +92,7 @@ class AvitoParser(BaseParser):
         # Ensure .env is loaded so COOKIES_API_KEY etc. are available
         try:
             from dotenv import load_dotenv
+
             load_dotenv()
         except ImportError:
             pass
@@ -145,13 +152,14 @@ class AvitoParser(BaseParser):
         from app.parsers.avito_detail import enrich_listing_from_detail
 
         # Check which external_ids already exist in DB to skip their detail pages
-        known_ids = self._get_known_external_ids([l.external_id for l in listings])
+        known_ids = self._get_known_external_ids([item.external_id for item in listings])
 
-        need_enrichment = [l for l in listings if l.external_id not in known_ids]
+        need_enrichment = [item for item in listings if item.external_id not in known_ids]
         skipped = len(listings) - len(need_enrichment)
 
-        logger.info("Enriching %d listings with detail pages (skipping %d already in DB)",
-                     len(need_enrichment), skipped)
+        logger.info(
+            "Enriching %d listings with detail pages (skipping %d already in DB)", len(need_enrichment), skipped
+        )
         enriched = 0
 
         def _fetch_one_detail(listing: ParsedListing) -> bool:
@@ -169,7 +177,7 @@ class AvitoParser(BaseParser):
 
         # Concurrent detail fetching with limited parallelism
         with ThreadPoolExecutor(max_workers=self._detail_concurrency) as executor:
-            futures = {executor.submit(_fetch_one_detail, l): l for l in need_enrichment}
+            futures = {executor.submit(_fetch_one_detail, item): item for item in need_enrichment}
             for future in as_completed(futures):
                 if future.result():
                     enriched += 1
@@ -195,7 +203,9 @@ class AvitoParser(BaseParser):
                         placeholders = ", ".join(f":id{i}" for i in range(len(external_ids)))
                         params = {f"id{i}": eid for i, eid in enumerate(external_ids)}
                         result = await conn.execute(
-                            text(f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"),
+                            text(
+                                f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"
+                            ),
                             params,
                         )
                         return {row[0] for row in result}
@@ -204,6 +214,7 @@ class AvitoParser(BaseParser):
 
             # Run async query from sync context (we're in a thread)
             import asyncio
+
             try:
                 loop = asyncio.get_running_loop()
             except RuntimeError:

@@ -1,28 +1,27 @@
-import html
 import json
 import random
 import re
 import time
 from datetime import datetime, timedelta
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from bs4 import BeautifulSoup
-from loguru import logger
-from pydantic import ValidationError
-
 from common_data import HEADERS
 from db_service import SQLiteDBHandler
-from dto import Proxy, AvitoConfig
+from dto import AvitoConfig, Proxy
 from filters.ads_filter import AdsFilter
 from hide_private_data import log_config
 from integrations.notifications.factory import build_notifier
 from load_config import load_avito_config
-from models import ItemsResponse, Item
+from loguru import logger
 from parser.cookies.factory import build_cookies_provider
 from parser.export.factory import build_result_storage
 from parser.http.client import HttpClient
 from parser.proxies.proxy_factory import build_proxy
+from pydantic import ValidationError
 from utils.parse_phone import ParsePhone
+
+from models import Item, ItemsResponse
 
 DEBUG_MODE = False
 
@@ -106,7 +105,7 @@ class AvitoParse:
                 if self.stop_event and self.stop_event.is_set():
                     return
                 if DEBUG_MODE:
-                    html_code = open("may.txt", "r", encoding="utf-8").read()
+                    html_code = open("may.txt", encoding="utf-8").read()
                 else:
                     html_code = self.fetch_data(url=url)
 

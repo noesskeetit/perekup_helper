@@ -1,10 +1,10 @@
-import requests
-import json
 import re
-from loguru import logger
 
+import requests
 from dto import AvitoConfig
 from integrations.notifications.transport import send_with_retries
+from loguru import logger
+
 from models import Item
 
 

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-from models import Item
 
 class ResultNamingStrategy(ABC):
 

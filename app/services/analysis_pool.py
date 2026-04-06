@@ -16,7 +16,6 @@ import logging
 import os
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import async_session_factory
 from app.models.listing import Listing, ListingAnalysis
@@ -112,6 +111,7 @@ async def _run_cloudru_worker(name: str, model: str, limit: int) -> int:
 
     try:
         from app.parsers.analyzer import analyze_new_listings
+
         analyzed = await analyze_new_listings(limit=limit)
         logger.info("Worker [%s] done: analyzed %d", name, analyzed)
         return analyzed
@@ -135,21 +135,21 @@ async def run_analysis_pool(max_total: int = 2000) -> dict:
 
     logger.info(
         "Analysis pool: backlog=%d, scaling to %d workers, %d per worker",
-        backlog, num_workers, per_worker,
+        backlog,
+        num_workers,
+        per_worker,
     )
 
     # Run workers concurrently
     tasks = []
     for cfg in configs:
-        tasks.append(
-            _run_worker(cfg["name"], cfg["provider"], cfg["model"], cfg["batch_size"], per_worker)
-        )
+        tasks.append(_run_worker(cfg["name"], cfg["provider"], cfg["model"], cfg["batch_size"], per_worker))
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     total_analyzed = 0
     worker_stats = []
-    for cfg, result in zip(configs, results):
+    for cfg, result in zip(configs, results, strict=False):
         if isinstance(result, Exception):
             logger.error("Worker [%s] failed: %s", cfg["name"], result)
             worker_stats.append({"name": cfg["name"], "analyzed": 0, "error": str(result)})

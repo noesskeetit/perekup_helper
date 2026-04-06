@@ -84,7 +84,6 @@ async def hot_deals(
     Ready-made JSON for Telegram bot or external consumers.
     """
     from sqlalchemy import desc, select
-    from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import selectinload
 
     from app.db.session import async_session_factory
@@ -111,20 +110,20 @@ async def hot_deals(
 
     return [
         {
-            "brand": l.brand,
-            "model": l.model,
-            "year": l.year,
-            "price": l.price,
-            "market_price": l.market_price,
-            "diff_pct": float(l.price_diff_pct) if l.price_diff_pct else 0,
-            "city": l.city,
-            "url": l.url,
-            "source": l.source,
-            "category": l.analysis.category if l.analysis else None,
-            "score": l.analysis.score if l.analysis else None,
-            "ai_summary": l.analysis.ai_summary if l.analysis else None,
+            "brand": listing.brand,
+            "model": listing.model,
+            "year": listing.year,
+            "price": listing.price,
+            "market_price": listing.market_price,
+            "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
+            "city": listing.city,
+            "url": listing.url,
+            "source": listing.source,
+            "category": listing.analysis.category if listing.analysis else None,
+            "score": listing.analysis.score if listing.analysis else None,
+            "ai_summary": listing.analysis.ai_summary if listing.analysis else None,
         }
-        for l in listings
+        for listing in listings
     ]
 
 

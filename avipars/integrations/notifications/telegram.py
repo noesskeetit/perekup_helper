@@ -1,8 +1,8 @@
 import requests
-
 from integrations.notifications.base import Notifier
 from integrations.notifications.transport import send_with_retries
 from integrations.notifications.utils import get_first_image
+
 from models import Item
 
 

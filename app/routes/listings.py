@@ -35,43 +35,25 @@ SORT_COLUMNS = {
 
 
 async def _get_stats(session: AsyncSession) -> dict:
-    """Compute dashboard summary stats."""
-    total = (await session.execute(select(func.count()).select_from(Listing).where(Listing.is_duplicate.is_(False)))).scalar() or 0
+    """Compute all dashboard stats in a single query."""
+    from sqlalchemy import case, literal_column
 
-    below_market = 0
-    hot_deals = 0
-    avg_diff = None
-
-    if total > 0:
-        below_market = (
-            await session.execute(
-                select(func.count())
-                .select_from(Listing)
-                .where(Listing.is_duplicate.is_(False), Listing.price_diff_pct > 0)
+    row = (
+        await session.execute(
+            select(
+                func.count().label("total"),
+                func.count().filter(Listing.price_diff_pct > 0).label("below_market"),
+                func.count().filter(Listing.price_diff_pct > 15).label("hot_deals"),
+                func.avg(Listing.price_diff_pct).filter(Listing.price_diff_pct.isnot(None)).label("avg_diff"),
+                func.avg(Listing.price).label("avg_price"),
             )
-        ).scalar() or 0
+            .where(Listing.is_duplicate.is_(False))
+        )
+    ).one()
 
-        hot_deals = (
-            await session.execute(
-                select(func.count())
-                .select_from(Listing)
-                .where(Listing.is_duplicate.is_(False), Listing.price_diff_pct > 15)
-            )
-        ).scalar() or 0
-
-        avg_diff_val = (
-            await session.execute(
-                select(func.avg(Listing.price_diff_pct))
-                .where(Listing.is_duplicate.is_(False), Listing.price_diff_pct.isnot(None))
-            )
-        ).scalar()
-        avg_diff = float(avg_diff_val) if avg_diff_val is not None else None
-
-    # Price model info
     model_info = None
     try:
         from app.services.pricing import get_price_model
-
         pm = get_price_model()
         if pm.is_trained:
             model_info = pm.get_info()
@@ -79,10 +61,11 @@ async def _get_stats(session: AsyncSession) -> dict:
         pass
 
     return {
-        "total": total,
-        "below_market": below_market,
-        "hot_deals": hot_deals,
-        "avg_diff": avg_diff,
+        "total": row.total or 0,
+        "below_market": row.below_market or 0,
+        "hot_deals": row.hot_deals or 0,
+        "avg_diff": float(row.avg_diff) if row.avg_diff else None,
+        "avg_price": float(row.avg_price) if row.avg_price else 0,
         "model_info": model_info,
     }
 
@@ -192,15 +175,6 @@ async def listings_page(
 
     stats = await _get_stats(session)
 
-    # Sidebar stats
-    avg_price_result = await session.execute(select(func.avg(Listing.price)))
-    avg_price = avg_price_result.scalar()
-
-    avg_discount_result = await session.execute(
-        select(func.avg(Listing.price_diff_pct)).where(Listing.price_diff_pct.isnot(None))
-    )
-    avg_discount = avg_discount_result.scalar()
-
     cat_result = await session.execute(
         select(ListingAnalysis.category, func.count(ListingAnalysis.id)).group_by(ListingAnalysis.category)
     )
@@ -233,8 +207,8 @@ async def listings_page(
         "page": page_v,
         "total_pages": total_pages,
         "total": total,
-        "avg_price": round(float(avg_price), 0) if avg_price else 0,
-        "avg_discount": round(float(avg_discount), 1) if avg_discount else 0,
+        "avg_price": round(stats["avg_price"], 0) if stats["avg_price"] else 0,
+        "avg_discount": round(float(stats["avg_diff"]), 1) if stats["avg_diff"] else 0,
         "by_category": by_category,
     }
 

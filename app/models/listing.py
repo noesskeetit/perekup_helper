@@ -73,6 +73,9 @@ class Listing(Base):
 
 class ListingAnalysis(Base):
     __tablename__ = "listing_analysis"
+    __table_args__ = (
+        Index("ix_analysis_category", "category"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     listing_id: Mapped[uuid.UUID] = mapped_column(

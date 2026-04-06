@@ -81,16 +81,30 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
             try:
                 await session.commit()
                 result.new_saved = len(new_listings)
+            except Exception:
+                await session.rollback()
+                logger.warning("Batch commit failed for %s, retrying one-by-one", source)
+                # Retry individually so one bad listing doesn't kill the batch
+                saved = 0
+                for listing in new_listings:
+                    try:
+                        async with async_session_factory() as retry_session:
+                            retry_session.add(listing)
+                            await retry_session.commit()
+                            saved += 1
+                    except Exception:
+                        result.errors += 1
+                result.new_saved = saved
+                if result.errors:
+                    logger.warning("Ingested %d/%d %s listings (%d failed)", saved, len(new_listings), source, result.errors)
+
+            if result.new_saved:
                 logger.info(
                     "Ingested %d new %s listings (%d duplicates skipped)",
                     result.new_saved,
                     source,
                     result.duplicates_skipped,
                 )
-            except Exception:
-                await session.rollback()
-                logger.exception("Failed to commit %s listings", source)
-                result.errors = len(new_listings)
         else:
             logger.info("No new %s listings to ingest (%d duplicates)", source, result.duplicates_skipped)
 

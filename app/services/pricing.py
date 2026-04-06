@@ -45,12 +45,39 @@ NUM_FEATURES = [
     "engine_volume",
     "power_hp",
     "owners_count",
+    "photo_count",
+    "listing_month",
+    "is_dealer",
+    "is_premium",
     "car_age",
     "log_car_age",
     "log_mileage",
     "mileage_per_year",
     "mileage_ratio",
+    "power_per_liter",
 ]
+
+PREMIUM_BRANDS = frozenset(
+    {
+        "bmw",
+        "mercedes-benz",
+        "mercedes",
+        "audi",
+        "lexus",
+        "porsche",
+        "infiniti",
+        "jaguar",
+        "land rover",
+        "volvo",
+        "cadillac",
+        "maserati",
+        "bentley",
+        "rolls-royce",
+        "ferrari",
+        "lamborghini",
+        "tesla",
+    }
+)
 ALL_FEATURES = CAT_FEATURES + NUM_FEATURES
 
 QUANTILES = [0.10, 0.50, 0.90]
@@ -292,7 +319,15 @@ class PriceModel:
                 df[col] = "unknown"
             df[col] = df[col].fillna("unknown").astype(str)
 
-        num_defaults = {"year": 2020, "mileage": 0, "engine_volume": 0.0, "power_hp": 0, "owners_count": 0}
+        num_defaults = {
+            "year": 2020,
+            "mileage": 0,
+            "engine_volume": 0.0,
+            "power_hp": 0,
+            "owners_count": 0,
+            "photo_count": 0,
+            "is_dealer": 0,
+        }
         for col, default in num_defaults.items():
             if col not in df.columns:
                 df[col] = default
@@ -317,6 +352,26 @@ class PriceModel:
         df["log_mileage"] = mileage.apply(lambda m: math.log(m + 1))
         df["mileage_per_year"] = mileage / car_age.clip(lower=1)
         df["mileage_ratio"] = mileage / (car_age * 15_000 + 1)
+
+        # Listing month — seasonal demand signal
+        if "listing_date" in df.columns:
+            ld = pd.to_datetime(df["listing_date"], errors="coerce", utc=True)
+            df["listing_month"] = ld.dt.month.fillna(0).astype(int)
+        elif "created_at" in df.columns:
+            ca = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
+            df["listing_month"] = ca.dt.month.fillna(0).astype(int)
+        else:
+            df["listing_month"] = 0
+
+        # Power per liter — engine tuning signal (sporty vs economy)
+        engine_vol = df["engine_volume"].astype(float)
+        power = df["power_hp"].astype(float)
+        df["power_per_liter"] = power / engine_vol.clip(lower=0.1)
+
+        # Is premium brand
+        brand_lower = df["brand"].astype(str).str.lower()
+        df["is_premium"] = brand_lower.isin(PREMIUM_BRANDS).astype(int)
+
         return df
 
 

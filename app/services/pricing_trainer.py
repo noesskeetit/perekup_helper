@@ -130,6 +130,9 @@ async def score_listings(limit: int = 500) -> int:
 
             if p50 and p50 > 0:
                 listing.market_price = p50
+                # Clamp to NUMERIC(5,2) range: -999.99 .. 999.99
+                if pct is not None:
+                    pct = max(-999.99, min(999.99, pct))
                 listing.price_diff_pct = pct
                 scored += 1
 

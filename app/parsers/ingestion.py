@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.db.session import async_session_factory
 from app.models.listing import Listing
@@ -42,11 +43,10 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
                     # Record old price in price_history
                     raw = existing.raw_data or {}
                     history: list[dict] = raw.get("price_history", [])
-                    history.append(
-                        {"price": existing.price, "date": datetime.utcnow().date().isoformat()}
-                    )
+                    history.append({"price": existing.price, "date": datetime.utcnow().date().isoformat()})
                     raw["price_history"] = history
                     existing.raw_data = raw
+                    flag_modified(existing, "raw_data")
                     existing.price = parsed.price
                     result.prices_updated += 1
                     logger.info(

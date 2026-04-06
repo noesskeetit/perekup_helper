@@ -34,11 +34,14 @@ CLOUDRU_API_URL = os.environ.get(
 )
 
 CATEGORIZE_PROMPT = """\
-Категоризируй авто. JSON, без markdown:
-{{"category":"clean|damaged_body|bad_docs|debtor|complex_but_profitable","confidence":0.0-1.0,"flags":[],"reasoning":"кратко"}}
+Проанализируй авто-объявление и верни JSON (без markdown):
 
-clean=ок, damaged_body=битая, bad_docs=нет ПТС, debtor=залог/арест, complex_but_profitable=дешево но сложно.
+Пример ответа:
+{{"category": "clean", "confidence": 0.85, "flags": [], "reasoning": "Обычный автомобиль без проблем"}}
 
+Категории: clean (ок), damaged_body (битая), bad_docs (нет ПТС/запрет), debtor (залог/арест), complex_but_profitable (дешево но сложно).
+
+Объявление:
 {text}"""
 
 DESCRIBE_IMAGE_PROMPT = "Опиши автомобиль на фото кратко: состояние кузова, видимые повреждения, цвет, тип кузова. 2-3 предложения."

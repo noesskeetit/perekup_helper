@@ -225,6 +225,7 @@ _BRAND_MAP: dict[str, str] = {
     "мерседес": "Mercedes-Benz",
     "мерседес-бенц": "Mercedes-Benz",
     "бмв": "BMW",
+    "bmw": "BMW",
     "фольксваген": "Volkswagen",
     "шкода": "Skoda",
     "ауди": "Audi",
@@ -330,8 +331,8 @@ def normalize_brand(brand: str | None) -> str | None:
     if base and base != key and base in _BRAND_MAP:
         return _BRAND_MAP[base]
 
-    # 3. Title-case fallback for unknown brands
-    return stripped.title()
+    # 3. Return as-is (don't title-case — preserves "BMW", "FAW", "JAC", etc.)
+    return stripped
 
 
 def normalize_listing(listing: ParsedListing) -> ParsedListing:

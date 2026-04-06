@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from sqlalchemy import select
 
@@ -67,6 +68,7 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
                 seller_type=parsed.seller_type,
                 seller_name=parsed.seller_name,
                 region=parsed.region,
+                listing_date=_parse_listing_date(parsed.listing_date),
                 is_dealer=parsed.is_dealer,
                 pts_type=parsed.pts_type,
                 customs_cleared=parsed.customs_cleared,
@@ -110,3 +112,13 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
             logger.info("No new %s listings to ingest (%d duplicates)", source, result.duplicates_skipped)
 
     return result
+
+
+def _parse_listing_date(iso_str: str | None) -> datetime | None:
+    """Convert an ISO date string (e.g. '2024-04-06') to a datetime object."""
+    if not iso_str:
+        return None
+    try:
+        return datetime.fromisoformat(iso_str)
+    except (ValueError, TypeError):
+        return None

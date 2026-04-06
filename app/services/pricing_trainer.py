@@ -7,13 +7,14 @@
 from __future__ import annotations
 
 import logging
+import math
 
 import pandas as pd
 from sqlalchemy import select
 
 from app.db.session import async_session_factory
 from app.models.listing import Listing
-from app.services.pricing import get_price_model
+from app.services.pricing import CURRENT_YEAR, get_price_model
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,8 @@ async def train_model() -> dict:
                 "engine_volume": row.engine_volume or 0.0,
                 "power_hp": row.power_hp or 0,
                 "owners_count": row.owners_count or 0,
+                "listing_date": row.listing_date,
+                "created_at": row.created_at,
             }
         )
 

@@ -175,6 +175,65 @@ _STEERING_MAP: dict[str, str] = {
     "right": SteeringWheel.RIGHT.value,
     "lhd": SteeringWheel.LEFT.value,
     "rhd": SteeringWheel.RIGHT.value,
+    # Auto.ru SSR values
+    "left_hand_drive": SteeringWheel.LEFT.value,
+    "right_hand_drive": SteeringWheel.RIGHT.value,
+}
+
+_PTS_MAP: dict[str, str] = {
+    "оригинал": PtsType.ORIGINAL.value,
+    "дубликат": PtsType.DUPLICATE.value,
+    "электронный": PtsType.ELECTRONIC.value,
+    # Auto.ru English
+    "original": PtsType.ORIGINAL.value,
+    "duplicate": PtsType.DUPLICATE.value,
+    "electronic": PtsType.ELECTRONIC.value,
+}
+
+_SELLER_TYPE_MAP: dict[str, str] = {
+    "частное лицо": SellerType.PRIVATE.value,
+    "дилер": SellerType.DEALER.value,
+    "автосалон": SellerType.SALON.value,
+    # Auto.ru English
+    "private": SellerType.PRIVATE.value,
+    "commercial": SellerType.DEALER.value,
+    "dealer": SellerType.DEALER.value,
+}
+
+# Auto.ru color_hex → Russian color name (for normalizer)
+_COLOR_MAP: dict[str, str] = {
+    "black": "чёрный",
+    "white": "белый",
+    "silver": "серебристый",
+    "grey": "серый",
+    "red": "красный",
+    "blue": "синий",
+    "light_blue": "голубой",
+    "green": "зелёный",
+    "brown": "коричневый",
+    "gold": "золотистый",
+    "orange": "оранжевый",
+    "yellow": "жёлтый",
+    "purple": "фиолетовый",
+    "violet": "фиолетовый",
+    "pink": "розовый",
+    "beige": "бежевый",
+    # Pass-through for already-Russian values
+    "чёрный": "чёрный",
+    "белый": "белый",
+    "серебристый": "серебристый",
+    "серый": "серый",
+    "красный": "красный",
+    "синий": "синий",
+    "голубой": "голубой",
+    "зелёный": "зелёный",
+    "коричневый": "коричневый",
+    "золотистый": "золотистый",
+    "оранжевый": "оранжевый",
+    "жёлтый": "жёлтый",
+    "фиолетовый": "фиолетовый",
+    "розовый": "розовый",
+    "бежевый": "бежевый",
 }
 
 # Brand normalization — different sources use different names for the same brand.
@@ -357,6 +416,9 @@ def normalize_listing(listing: ParsedListing) -> ParsedListing | None:
     listing.body_type = _norm(listing.body_type, _BODY_MAP)
     listing.engine_type = _norm(listing.engine_type, _ENGINE_MAP)
     listing.steering_wheel = _norm(listing.steering_wheel, _STEERING_MAP)
+    listing.pts_type = _norm(listing.pts_type, _PTS_MAP)
+    listing.seller_type = _norm(listing.seller_type, _SELLER_TYPE_MAP)
+    listing.color = _norm(listing.color, _COLOR_MAP)
 
     # ── Sanity checks ───────────────────────────────────────────────────────
 

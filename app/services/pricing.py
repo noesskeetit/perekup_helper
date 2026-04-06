@@ -17,6 +17,7 @@ Model retrains daily on fresh data.
 from __future__ import annotations
 
 import logging
+import math
 import pickle
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +25,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor, Pool
+
+CURRENT_YEAR = 2026
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,18 @@ MIN_TRAINING_SAMPLES = 200
 
 # Feature columns — categorical features handled natively by CatBoost
 CAT_FEATURES = ["brand", "model", "source", "city", "engine_type", "transmission", "drive_type", "body_type"]
-NUM_FEATURES = ["year", "mileage", "engine_volume", "power_hp", "owners_count"]
+NUM_FEATURES = [
+    "year",
+    "mileage",
+    "engine_volume",
+    "power_hp",
+    "owners_count",
+    "car_age",
+    "log_car_age",
+    "log_mileage",
+    "mileage_per_year",
+    "mileage_ratio",
+]
 ALL_FEATURES = CAT_FEATURES + NUM_FEATURES
 
 QUANTILES = [0.10, 0.50, 0.90]
@@ -81,6 +95,17 @@ class PriceModel:
         X = df[self._feature_names]
         y = df["price"]
 
+        # Compute sample weights with time decay so recent listings matter more
+        now = datetime.now(UTC)
+        if "listing_date" in df.columns:
+            ref_dates = pd.to_datetime(df["listing_date"], utc=True).fillna(now)
+        elif "created_at" in df.columns:
+            ref_dates = pd.to_datetime(df["created_at"], utc=True).fillna(now)
+        else:
+            ref_dates = pd.Series([now] * len(df))
+        days_old = (now - ref_dates).dt.total_seconds() / 86400.0
+        weights = np.exp(-0.007 * days_old.values)
+
         cat_feature_indices = [self._feature_names.index(f) for f in CAT_FEATURES]
 
         stats = {"status": "trained", "samples": len(df), "quantile_metrics": {}}
@@ -103,9 +128,10 @@ class PriceModel:
             split_idx = int(len(df) * 0.8)
             X_train, X_val = X.iloc[:split_idx], X.iloc[split_idx:]
             y_train, y_val = y.iloc[:split_idx], y.iloc[split_idx:]
+            w_train, w_val = weights[:split_idx], weights[split_idx:]
 
-            train_pool = Pool(X_train, y_train, cat_features=cat_feature_indices)
-            val_pool = Pool(X_val, y_val, cat_features=cat_feature_indices)
+            train_pool = Pool(X_train, y_train, cat_features=cat_feature_indices, weight=w_train)
+            val_pool = Pool(X_val, y_val, cat_features=cat_feature_indices, weight=w_val)
 
             model.fit(train_pool, eval_set=val_pool, verbose=0)
             self._models[quantile] = model
@@ -271,6 +297,21 @@ class PriceModel:
             else:
                 df[col] = df[col].astype(int)
 
+        df = self._add_derived_features(df)
+        return df
+
+    @staticmethod
+    def _add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
+        """Compute derived numeric features from base columns."""
+        year = df["year"].astype(int)
+        mileage = df["mileage"].astype(float)
+
+        car_age = CURRENT_YEAR - year
+        df["car_age"] = car_age
+        df["log_car_age"] = car_age.apply(lambda a: math.log(a + 1))
+        df["log_mileage"] = mileage.apply(lambda m: math.log(m + 1))
+        df["mileage_per_year"] = mileage / car_age.clip(lower=1)
+        df["mileage_ratio"] = mileage / (car_age * 15_000 + 1)
         return df
 
 

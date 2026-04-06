@@ -56,6 +56,7 @@ class ParseResult:
     total_fetched: int = 0
     new_saved: int = 0
     duplicates_skipped: int = 0
+    prices_updated: int = 0
     errors: int = 0
     elapsed_seconds: float = 0.0
     pages_fetched: int = 0

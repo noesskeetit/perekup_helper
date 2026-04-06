@@ -27,17 +27,38 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
 
     async with async_session_factory() as session:
         external_ids = [item.external_id for item in listings]
-        stmt = select(Listing.external_id).where(
+        stmt = select(Listing).where(
             Listing.source == source,
             Listing.external_id.in_(external_ids),
         )
         rows = await session.execute(stmt)
-        existing_ids = {row[0] for row in rows}
+        existing_by_eid: dict[str, Listing] = {row[0].external_id: row[0] for row in rows}
 
         new_listings = []
         for parsed in listings:
-            if parsed.external_id in existing_ids:
-                result.duplicates_skipped += 1
+            existing = existing_by_eid.get(parsed.external_id)
+            if existing is not None:
+                if parsed.price != existing.price:
+                    # Record old price in price_history
+                    raw = existing.raw_data or {}
+                    history: list[dict] = raw.get("price_history", [])
+                    history.append(
+                        {"price": existing.price, "date": datetime.utcnow().date().isoformat()}
+                    )
+                    raw["price_history"] = history
+                    existing.raw_data = raw
+                    existing.price = parsed.price
+                    result.prices_updated += 1
+                    logger.info(
+                        "Price change for %s %s: %d -> %d (external_id=%s)",
+                        source,
+                        parsed.external_id,
+                        history[-1]["price"],
+                        parsed.price,
+                        parsed.external_id,
+                    )
+                else:
+                    result.duplicates_skipped += 1
                 continue
 
             listing = Listing(
@@ -77,7 +98,7 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
             )
             new_listings.append(listing)
 
-        if new_listings:
+        if new_listings or result.prices_updated:
             session.add_all(new_listings)
             try:
                 await session.commit()
@@ -101,12 +122,13 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
                         "Ingested %d/%d %s listings (%d failed)", saved, len(new_listings), source, result.errors
                     )
 
-            if result.new_saved:
+            if result.new_saved or result.prices_updated:
                 logger.info(
-                    "Ingested %d new %s listings (%d duplicates skipped)",
+                    "Ingested %d new %s listings (%d duplicates skipped, %d prices updated)",
                     result.new_saved,
                     source,
                     result.duplicates_skipped,
+                    result.prices_updated,
                 )
         else:
             logger.info("No new %s listings to ingest (%d duplicates)", source, result.duplicates_skipped)

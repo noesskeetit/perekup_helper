@@ -5,6 +5,8 @@ Standard httpx is blocked by TLS fingerprinting — curl_cffi with Chrome
 impersonation is required. Session cookies must be warmed up.
 
 Data is embedded in HTML as window.__INITIAL_STATE__ JSON.
+
+Performance: randomized pauses, UA rotation, captcha recovery with IP change.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import time
 
@@ -20,9 +23,16 @@ from app.parsers.base import BaseParser, ParsedListing
 
 logger = logging.getLogger(__name__)
 
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+]
+
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "User-Agent": random.choice(USER_AGENTS),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
@@ -60,11 +70,11 @@ class AutoruParser(BaseParser):
         self,
         searches: list[dict] | None = None,
         pages_per_search: int = 2,
-        pause_between_requests: float = 4.0,
+        pause_range: tuple[float, float] = (3.0, 5.0),
     ):
         self._searches = searches or DEFAULT_SEARCHES
         self._pages = pages_per_search
-        self._pause = pause_between_requests
+        self._pause_range = pause_range
 
     async def fetch_listings(self) -> list[ParsedListing]:
         all_listings: list[ParsedListing] = []
@@ -84,7 +94,9 @@ class AutoruParser(BaseParser):
         seen_ids: set[str] = set()
 
         session = cffi_requests.Session(impersonate="chrome")
-        session.headers.update(HEADERS)
+        # Rotate UA at session level
+        headers = {**HEADERS, "User-Agent": random.choice(USER_AGENTS)}
+        session.headers.update(headers)
 
         # Set proxy if available
         proxy_string = os.environ.get("PROXY_STRING", "")
@@ -111,6 +123,7 @@ class AutoruParser(BaseParser):
             except Exception:
                 logger.debug("Auto.ru: failed to warm up session")
 
+        captcha_count = 0
         for search in self._searches:
             base_url = search["url"]
 
@@ -118,16 +131,23 @@ class AutoruParser(BaseParser):
                 url = f"{base_url}&page={page}" if "page=" not in base_url else base_url
 
                 try:
+                    # Rotate UA per request
+                    session.headers["User-Agent"] = random.choice(USER_AGENTS)
                     resp = session.get(url, timeout=60)
 
-                    # Check for captcha
+                    # Check for captcha — change IP and skip to next search URL
                     if "captcha.auto.ru" in str(resp.url) or resp.status_code == 403:
-                        logger.warning("Auto.ru: captcha triggered, stopping this search")
-                        break
+                        captcha_count += 1
+                        logger.warning("Auto.ru: captcha #%d triggered on %s, changing IP and skipping to next search",
+                                       captcha_count, base_url)
+                        self._try_change_ip()
+                        time.sleep(5)
+                        break  # Skip to next search URL, not stopping entirely
 
                     if resp.status_code == 429:
-                        logger.warning("Auto.ru: rate limited, backing off")
-                        time.sleep(15)
+                        logger.warning("Auto.ru: rate limited, changing IP and backing off")
+                        self._try_change_ip()
+                        time.sleep(10)
                         break
 
                     if resp.status_code != 200:
@@ -149,10 +169,19 @@ class AutoruParser(BaseParser):
                     logger.warning("Auto.ru: failed to fetch %s", url, exc_info=True)
                     break
 
-                time.sleep(self._pause)
+                time.sleep(random.uniform(*self._pause_range))
 
-        logger.info("AutoruParser fetched %d listings total", len(all_listings))
+        logger.info("AutoruParser fetched %d listings total (captchas hit: %d)", len(all_listings), captcha_count)
         return all_listings
+
+    @staticmethod
+    def _try_change_ip() -> None:
+        """Attempt to rotate proxy IP via the proxy manager."""
+        try:
+            from app.parsers.proxy_manager import change_ip
+            change_ip()
+        except Exception:
+            logger.debug("Auto.ru: IP change failed", exc_info=True)
 
     def _extract_offers(self, html: str) -> list[ParsedListing]:
         """Extract offers from Auto.ru HTML via regex."""

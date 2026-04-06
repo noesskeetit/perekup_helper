@@ -1,4 +1,8 @@
-"""Avito parser adapter — wraps AviPars to produce ParsedListing objects."""
+"""Avito parser adapter — wraps AviPars to produce ParsedListing objects.
+
+Performance: reduced detail page pause, skips detail fetch for listings
+already in the database (by external_id check).
+"""
 
 from __future__ import annotations
 
@@ -65,7 +69,7 @@ class AvitoParser(BaseParser):
 
     source_name = "avito"
 
-    def __init__(self, config_path: str = "avipars/config.toml", fetch_details: bool = True, detail_pause: float = 1.5):
+    def __init__(self, config_path: str = "avipars/config.toml", fetch_details: bool = True, detail_pause: float = 1.0):
         self._config_path = config_path
         self._fetch_details = fetch_details
         self._detail_pause = detail_pause
@@ -121,15 +125,26 @@ class AvitoParser(BaseParser):
         return results
 
     def _enrich_with_details(self, listings: list[ParsedListing], avito_parser) -> list[ParsedListing]:
-        """Fetch detail pages and extract full specs."""
+        """Fetch detail pages and extract full specs.
+
+        Skips detail fetch for listings whose external_id already exists in the
+        database, saving ~1s per known listing.
+        """
         import time
 
         from app.parsers.avito_detail import enrich_listing_from_detail
 
-        logger.info("Enriching %d listings with detail pages", len(listings))
+        # Check which external_ids already exist in DB to skip their detail pages
+        known_ids = self._get_known_external_ids([l.external_id for l in listings])
+
+        need_enrichment = [l for l in listings if l.external_id not in known_ids]
+        skipped = len(listings) - len(need_enrichment)
+
+        logger.info("Enriching %d listings with detail pages (skipping %d already in DB)",
+                     len(need_enrichment), skipped)
         enriched = 0
 
-        for listing in listings:
+        for listing in need_enrichment:
             if not listing.url:
                 continue
             try:
@@ -142,8 +157,41 @@ class AvitoParser(BaseParser):
 
             time.sleep(self._detail_pause)
 
-        logger.info("Enriched %d/%d listings with detail data", enriched, len(listings))
+        logger.info("Enriched %d/%d listings with detail data", enriched, len(need_enrichment))
         return listings
+
+    @staticmethod
+    def _get_known_external_ids(external_ids: list[str]) -> set[str]:
+        """Query the database for which external_ids already exist (sync-safe)."""
+        if not external_ids:
+            return set()
+        try:
+            from sqlalchemy import create_engine, text
+
+            import app.config as cfg
+            db_url = getattr(cfg, "DATABASE_URL", None) or ""
+            if not db_url:
+                import os
+                db_url = os.environ.get("DATABASE_URL", "")
+            if not db_url:
+                return set()
+
+            # Convert async URL to sync if needed
+            sync_url = db_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+            engine = create_engine(sync_url)
+
+            with engine.connect() as conn:
+                # Use parameterized query with IN clause
+                placeholders = ", ".join(f":id{i}" for i in range(len(external_ids)))
+                params = {f"id{i}": eid for i, eid in enumerate(external_ids)}
+                result = conn.execute(
+                    text(f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"),
+                    params,
+                )
+                return {row[0] for row in result}
+        except Exception:
+            logger.debug("Avito: could not check existing IDs, will enrich all", exc_info=True)
+            return set()
 
     def _convert_ad(self, ad) -> ParsedListing | None:
         title = getattr(ad, "title", "") or ""

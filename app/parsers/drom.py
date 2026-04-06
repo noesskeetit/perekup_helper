@@ -4,6 +4,9 @@ Drom.ru does NOT use Cloudflare — standard httpx works fine.
 Listing pages have data in HTML (unstable CSS classes), but card URLs
 can be reliably extracted via URL regex pattern.
 Card pages have JSON-LD with structured data.
+
+Performance: concurrent card fetching with semaphore, randomized pauses,
+and User-Agent rotation to maximize listings/ban ratio.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import random
 import re
 
 import httpx
@@ -20,9 +24,17 @@ from app.parsers.base import BaseParser, ParsedListing
 
 logger = logging.getLogger(__name__)
 
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+]
+
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "User-Agent": random.choice(USER_AGENTS),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
 }
@@ -84,41 +96,60 @@ class DromParser(BaseParser):
         urls: list[str] | None = None,
         pages_per_url: int = 3,
         max_cards_per_url: int = 30,
-        pause_between_requests: float = 2.5,
+        listing_pause: float = 1.5,
+        card_pause_range: tuple[float, float] = (0.5, 1.5),
+        concurrency: int = 3,
     ):
         self._urls = urls or DEFAULT_URLS
         self._pages = pages_per_url
         self._max_cards = max_cards_per_url
-        self._pause = pause_between_requests
+        self._listing_pause = listing_pause
+        self._card_pause_range = card_pause_range
+        self._concurrency = concurrency
 
     async def fetch_listings(self) -> list[ParsedListing]:
+        """Fetch listings: collect card URLs from all listing pages, then
+        fetch card details concurrently with a semaphore."""
         all_listings: list[ParsedListing] = []
         seen_ids: set[str] = set()
 
         proxy_url = self._get_proxy_url()
-        client_kwargs = {"headers": HEADERS, "timeout": 40, "follow_redirects": True}
+        headers = {**HEADERS, "User-Agent": random.choice(USER_AGENTS)}
+        client_kwargs = {"headers": headers, "timeout": 40, "follow_redirects": True}
         if proxy_url:
             client_kwargs["proxy"] = proxy_url
             logger.info("Drom: using proxy %s", proxy_url.split("@")[-1] if "@" in proxy_url else "configured")
 
         async with httpx.AsyncClient(**client_kwargs) as client:
+            # Phase 1: collect ALL card URLs from all listing pages
+            all_card_urls: list[str] = []
             for base_url in self._urls:
                 card_urls = await self._collect_card_urls(client, base_url)
+                for url in card_urls[: self._max_cards]:
+                    m = BULL_URL_RE.search(url)
+                    eid = m.group(1) if m else None
+                    if eid and eid not in seen_ids:
+                        all_card_urls.append(url)
+                        seen_ids.add(eid)
 
-                for card_url in card_urls[: self._max_cards]:
-                    external_id = BULL_URL_RE.search(card_url)
-                    if external_id and external_id.group(1) in seen_ids:
-                        continue
+            logger.info("Drom: collected %d unique card URLs from %d search URLs", len(all_card_urls), len(self._urls))
 
+            # Phase 2: fetch cards concurrently
+            sem = asyncio.Semaphore(self._concurrency)
+
+            async def _fetch_one(card_url: str) -> ParsedListing | None:
+                async with sem:
+                    await asyncio.sleep(random.uniform(*self._card_pause_range))
                     try:
-                        listing = await self._fetch_card(client, card_url)
-                        if listing and listing.external_id not in seen_ids:
-                            all_listings.append(listing)
-                            seen_ids.add(listing.external_id)
+                        return await self._fetch_card(client, card_url)
                     except Exception:
                         logger.debug("Drom: failed to fetch card %s", card_url, exc_info=True)
+                        return None
 
-                    await asyncio.sleep(self._pause)
+            results = await asyncio.gather(*[_fetch_one(u) for u in all_card_urls])
+            for listing in results:
+                if listing is not None:
+                    all_listings.append(listing)
 
         logger.info("DromParser fetched %d listings total", len(all_listings))
         return all_listings
@@ -130,7 +161,9 @@ class DromParser(BaseParser):
         for page in range(1, self._pages + 1):
             url = f"{base_url.rstrip('/')}page{page}/" if page > 1 else base_url
             try:
-                resp = await client.get(url)
+                # Rotate UA per listing page request
+                headers = {"User-Agent": random.choice(USER_AGENTS)}
+                resp = await client.get(url, headers=headers)
                 if resp.status_code != 200:
                     logger.warning("Drom: %s returned %d", url, resp.status_code)
                     break
@@ -162,7 +195,7 @@ class DromParser(BaseParser):
                 logger.warning("Drom: failed to fetch listing page %s", url, exc_info=True)
                 break
 
-            await asyncio.sleep(self._pause)
+            await asyncio.sleep(random.uniform(1.0, self._listing_pause))
 
         return card_urls
 

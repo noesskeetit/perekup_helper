@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 
@@ -15,15 +16,14 @@ from perekup_helper.models import ListingDescription
 
 logger = logging.getLogger(__name__)
 
-# Map perekup_helper CarCategory values → DB AnalysisCategory
+# CarCategory values now match AnalysisCategory exactly.
+# This map handles the direct correspondence plus edge cases.
 _CATEGORY_MAP = {
     "clean": AnalysisCategory.CLEAN,
     "damaged_body": AnalysisCategory.DAMAGED_BODY,
-    "document_issues": AnalysisCategory.BAD_DOCS,
-    "owner_debtor": AnalysisCategory.DEBTOR,
-    "complex_profitable": AnalysisCategory.COMPLEX_BUT_PROFITABLE,
-    # junk has no DB enum — map to damaged_body as closest
-    "junk": AnalysisCategory.DAMAGED_BODY,
+    "bad_docs": AnalysisCategory.BAD_DOCS,
+    "debtor": AnalysisCategory.DEBTOR,
+    "complex_but_profitable": AnalysisCategory.COMPLEX_BUT_PROFITABLE,
 }
 
 
@@ -83,17 +83,16 @@ async def analyze_new_listings(limit: int = 50) -> int:
                 categorizer = CloudRuCategorizer(api_key=settings.cloudru_fm_api_key)
                 for desc in descriptions:
                     try:
-                        sr = categorizer.categorize_and_score(desc)
+                        sr = await categorizer.categorize_and_score(desc)
                         score_results.append(sr)
                     except Exception:
                         logger.warning("Cloud.ru categorization failed for %s", desc.id, exc_info=True)
-                    import time
-                    time.sleep(1)  # rate limit safety
+                    await asyncio.sleep(1)  # rate limit safety
             else:
                 api_key = settings.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY", "")
                 model = settings.openrouter_model or "qwen/qwen3.6-plus:free"
                 processor = BatchProcessor(api_key=api_key, model=model)
-                score_results = processor.process(descriptions)
+                score_results = await processor.process(descriptions)
         except Exception:
             logger.exception("AI categorization failed")
             return 0

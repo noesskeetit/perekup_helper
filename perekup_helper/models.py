@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
 
 class CarCategory(str, Enum):
-    """Категории авто по состоянию/документам."""
+    """Категории авто по состоянию/документам.
+
+    Values match AnalysisCategory in app/models/listing.py (the DB enum).
+    """
 
     CLEAN = "clean"
     """Ровная — чистые документы, нормальный кузов."""
@@ -16,36 +20,82 @@ class CarCategory(str, Enum):
     DAMAGED_BODY = "damaged_body"
     """Кривой кузов — может не встать на учёт."""
 
-    DOCUMENT_ISSUES = "document_issues"
-    """Проблемы с документами."""
+    BAD_DOCS = "bad_docs"
+    """Проблемы с документами — нет ПТС, запрет регистрации."""
 
-    OWNER_DEBTOR = "owner_debtor"
-    """Собственник-должник — кредиты, задолженности."""
+    DEBTOR = "debtor"
+    """Собственник-должник — кредиты, задолженности, залог, арест."""
 
-    COMPLEX_PROFITABLE = "complex_profitable"
+    COMPLEX_BUT_PROFITABLE = "complex_but_profitable"
     """Сложная но выгодная — цена сильно ниже рынка, но нужно повозиться."""
 
-    JUNK = "junk"
-    """Откровенный мусор."""
+
+# Mapping from old/mismatched category strings to correct CarCategory values.
+# Used for fuzzy matching when LLM returns a legacy or slightly wrong category name.
+CATEGORY_ALIASES: dict[str, CarCategory] = {
+    # exact matches
+    "clean": CarCategory.CLEAN,
+    "damaged_body": CarCategory.DAMAGED_BODY,
+    "bad_docs": CarCategory.BAD_DOCS,
+    "debtor": CarCategory.DEBTOR,
+    "complex_but_profitable": CarCategory.COMPLEX_BUT_PROFITABLE,
+    # old prompt values (legacy)
+    "document_issues": CarCategory.BAD_DOCS,
+    "owner_debtor": CarCategory.DEBTOR,
+    "complex_profitable": CarCategory.COMPLEX_BUT_PROFITABLE,
+    # other common LLM variations
+    "junk": CarCategory.DAMAGED_BODY,
+    "bad_documents": CarCategory.BAD_DOCS,
+    "docs_issues": CarCategory.BAD_DOCS,
+    "doc_issues": CarCategory.BAD_DOCS,
+    "debt": CarCategory.DEBTOR,
+    "complex": CarCategory.COMPLEX_BUT_PROFITABLE,
+    "profitable": CarCategory.COMPLEX_BUT_PROFITABLE,
+}
+
+
+def resolve_category(raw_value: str) -> CarCategory:
+    """Resolve a raw category string to CarCategory, using aliases for fuzzy matching.
+
+    Tries exact enum match first, then alias lookup, then substring matching.
+    Falls back to CLEAN if nothing matches.
+    """
+    normalized = raw_value.strip().lower().replace("-", "_").replace(" ", "_")
+
+    # 1. Exact enum value match
+    try:
+        return CarCategory(normalized)
+    except ValueError:
+        pass
+
+    # 2. Alias lookup
+    if normalized in CATEGORY_ALIASES:
+        return CATEGORY_ALIASES[normalized]
+
+    # 3. Substring / partial match in aliases
+    for alias, cat in CATEGORY_ALIASES.items():
+        if alias in normalized or normalized in alias:
+            return cat
+
+    logging.getLogger(__name__).warning("Unknown category '%s', falling back to CLEAN", raw_value)
+    return CarCategory.CLEAN
 
 
 CATEGORY_LABELS: dict[CarCategory, str] = {
     CarCategory.CLEAN: "Ровная (чистые документы, нормальный кузов)",
     CarCategory.DAMAGED_BODY: "Кривой кузов (может не встать на учёт)",
-    CarCategory.DOCUMENT_ISSUES: "Проблемы с документами",
-    CarCategory.OWNER_DEBTOR: "Собственник-должник (кредиты, задолженности)",
-    CarCategory.COMPLEX_PROFITABLE: "Сложная но выгодная (цена ниже рынка, нужно повозиться)",
-    CarCategory.JUNK: "Откровенный мусор",
+    CarCategory.BAD_DOCS: "Проблемы с документами",
+    CarCategory.DEBTOR: "Собственник-должник (кредиты, задолженности)",
+    CarCategory.COMPLEX_BUT_PROFITABLE: "Сложная но выгодная (цена ниже рынка, нужно повозиться)",
 }
 
 # Скоринговые веса по категориям (базовый балл категории от 0 до 1)
 CATEGORY_BASE_SCORES: dict[CarCategory, float] = {
     CarCategory.CLEAN: 1.0,
-    CarCategory.COMPLEX_PROFITABLE: 0.7,
+    CarCategory.COMPLEX_BUT_PROFITABLE: 0.7,
     CarCategory.DAMAGED_BODY: 0.3,
-    CarCategory.DOCUMENT_ISSUES: 0.2,
-    CarCategory.OWNER_DEBTOR: 0.15,
-    CarCategory.JUNK: 0.0,
+    CarCategory.BAD_DOCS: 0.2,
+    CarCategory.DEBTOR: 0.15,
 }
 
 

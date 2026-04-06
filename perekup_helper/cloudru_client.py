@@ -1,4 +1,4 @@
-"""Cloud.ru FM API client for AI categorization.
+"""Cloud.ru FM API client for AI categorization (async).
 
 Two-stage pipeline:
 1. DeepSeek-OCR-2 (VLM, 8k context) — describes car photos
@@ -9,10 +9,11 @@ GLM-4.7 is a thinking model: it reasons in 'reasoning' field and outputs final a
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
-import time
+import re
 
 import httpx
 
@@ -22,6 +23,7 @@ from perekup_helper.models import (
     CategoryResult,
     ListingDescription,
     ScoreResult,
+    resolve_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,15 +35,14 @@ CLOUDRU_API_URL = os.environ.get(
 
 CATEGORIZE_PROMPT = """\
 Категоризируй авто-объявление. Ответь ТОЛЬКО JSON без markdown:
-{{"category": "<clean|damaged_body|document_issues|owner_debtor|complex_profitable|junk>", "confidence": <0.0-1.0>, "flags": ["флаг1", "флаг2"], "reasoning": "<1-2 предложения>"}}
+{{"category": "<clean|damaged_body|bad_docs|debtor|complex_but_profitable>", "confidence": <0.0-1.0>, "flags": ["флаг1", "флаг2"], "reasoning": "<1-2 предложения>"}}
 
 Категории:
 - clean: чистые документы, нормальный кузов
 - damaged_body: серьёзные повреждения кузова
-- document_issues: нет ПТС, запрет регистрации
-- owner_debtor: кредиты, залог, арест
-- complex_profitable: цена ниже рынка, но нужно повозиться
-- junk: не на ходу, гнилой кузов
+- bad_docs: нет ПТС, запрет регистрации
+- debtor: кредиты, залог, арест
+- complex_but_profitable: цена ниже рынка, но нужно повозиться
 
 Объявление:
 {text}"""
@@ -50,7 +51,7 @@ DESCRIBE_IMAGE_PROMPT = "Опиши автомобиль на фото крат�
 
 
 class CloudRuCategorizer:
-    """AI categorizer using Cloud.ru Foundation Models."""
+    """AI categorizer using Cloud.ru Foundation Models (async)."""
 
     def __init__(
         self,
@@ -62,16 +63,16 @@ class CloudRuCategorizer:
         self._ocr_model = ocr_model
         self._text_model = text_model
 
-    def categorize(self, listing: ListingDescription) -> CategoryResult:
+    async def categorize(self, listing: ListingDescription) -> CategoryResult:
         """Categorize a listing using GLM-4.7."""
         prompt = CATEGORIZE_PROMPT.format(text=listing.text)
-        raw = self._call_api(self._text_model, [{"role": "user", "content": prompt}], max_tokens=1000)
+        raw = await self._call_api(self._text_model, [{"role": "user", "content": prompt}], max_tokens=1000)
         return self._parse_response(raw)
 
-    def categorize_with_image(self, listing: ListingDescription, image_url: str) -> CategoryResult:
+    async def categorize_with_image(self, listing: ListingDescription, image_url: str) -> CategoryResult:
         """Describe image with DeepSeek-OCR-2, then categorize with GLM-4.7."""
         # Stage 1: describe image
-        photo_desc = self.describe_image(image_url)
+        photo_desc = await self.describe_image(image_url)
 
         # Stage 2: categorize with both text and photo description
         full_text = listing.text
@@ -79,10 +80,10 @@ class CloudRuCategorizer:
             full_text += f"\n\nОписание фото: {photo_desc}"
 
         prompt = CATEGORIZE_PROMPT.format(text=full_text)
-        raw = self._call_api(self._text_model, [{"role": "user", "content": prompt}], max_tokens=1000)
+        raw = await self._call_api(self._text_model, [{"role": "user", "content": prompt}], max_tokens=1000)
         return self._parse_response(raw)
 
-    def describe_image(self, image_url: str) -> str | None:
+    async def describe_image(self, image_url: str) -> str | None:
         """Use DeepSeek-OCR-2 to describe a car photo."""
         messages = [
             {
@@ -94,17 +95,17 @@ class CloudRuCategorizer:
             }
         ]
         try:
-            return self._call_api(self._ocr_model, messages, max_tokens=300)
+            return await self._call_api(self._ocr_model, messages, max_tokens=300)
         except Exception:
             logger.warning("Failed to describe image: %s", image_url[:80], exc_info=True)
             return None
 
-    def categorize_and_score(self, listing: ListingDescription, image_url: str | None = None) -> ScoreResult:
+    async def categorize_and_score(self, listing: ListingDescription, image_url: str | None = None) -> ScoreResult:
         """Categorize + compute attractiveness score."""
         if image_url:
-            cat = self.categorize_with_image(listing, image_url)
+            cat = await self.categorize_with_image(listing, image_url)
         else:
-            cat = self.categorize(listing)
+            cat = await self.categorize(listing)
 
         price_ratio = _compute_price_ratio(listing.price, listing.market_price)
         score = _compute_attractiveness(cat, price_ratio)
@@ -116,8 +117,8 @@ class CloudRuCategorizer:
             attractiveness_score=score,
         )
 
-    def _call_api(self, model: str, messages: list[dict], max_tokens: int = 1000) -> str:
-        """Call Cloud.ru FM API with retry."""
+    async def _call_api(self, model: str, messages: list[dict], max_tokens: int = 1000) -> str:
+        """Call Cloud.ru FM API with retry (async)."""
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -129,77 +130,77 @@ class CloudRuCategorizer:
             "temperature": 0.1,
         }
 
-        for attempt in range(3):
-            try:
-                resp = httpx.post(CLOUDRU_API_URL, json=payload, headers=headers, timeout=90)
-                if resp.status_code == 429:
-                    wait = 5 * (attempt + 1)
-                    logger.warning("Cloud.ru rate limit, waiting %ds", wait)
-                    time.sleep(wait)
-                    continue
-                resp.raise_for_status()
-                data = resp.json()
-                choice = data["choices"][0]["message"]
-                # GLM-4.7 is a thinking model: final JSON in content, chain-of-thought in reasoning
-                content = choice.get("content") or ""
-                reasoning = choice.get("reasoning") or ""
-                # Prefer content if it looks like JSON, otherwise extract JSON from reasoning
-                if content and ("{" in content):
-                    return content
-                if reasoning and ("{" in reasoning):
-                    # Extract last JSON block from reasoning
-                    import re
-                    json_blocks = re.findall(r'\{[^{}]*"category"[^{}]*\}', reasoning, re.DOTALL)
-                    if json_blocks:
-                        return json_blocks[-1]
-                return content or reasoning
-            except Exception as e:
-                logger.warning("Cloud.ru API error (attempt %d): %s", attempt + 1, e)
-                if attempt < 2:
-                    time.sleep(3)
+        async with httpx.AsyncClient() as client:
+            for attempt in range(3):
+                try:
+                    resp = await client.post(CLOUDRU_API_URL, json=payload, headers=headers, timeout=90)
+                    if resp.status_code == 429:
+                        wait = 5 * (attempt + 1)
+                        logger.warning("Cloud.ru rate limit, waiting %ds", wait)
+                        await asyncio.sleep(wait)
+                        continue
+                    resp.raise_for_status()
+                    data = resp.json()
+                    choice = data["choices"][0]["message"]
+                    # GLM-4.7 is a thinking model: final JSON in content, chain-of-thought in reasoning
+                    content = choice.get("content") or ""
+                    reasoning = choice.get("reasoning") or ""
+                    # Prefer content if it looks like JSON, otherwise extract JSON from reasoning
+                    if content and ("{" in content):
+                        return content
+                    if reasoning and ("{" in reasoning):
+                        # Extract last JSON block from reasoning
+                        json_blocks = re.findall(r'\{[^{}]*"category"[^{}]*\}', reasoning, re.DOTALL)
+                        if json_blocks:
+                            return json_blocks[-1]
+                    return content or reasoning
+                except Exception as e:
+                    logger.warning("Cloud.ru API error (attempt %d): %s", attempt + 1, e)
+                    if attempt < 2:
+                        await asyncio.sleep(3)
 
         raise RuntimeError("Cloud.ru FM API failed after retries")
 
     @staticmethod
     def _parse_response(raw: str) -> CategoryResult:
-        """Parse JSON response into CategoryResult."""
-        import re
-
+        """Parse JSON response into CategoryResult with robust extraction and fuzzy matching."""
         cleaned = raw.strip()
 
         # Remove markdown fences
         if "```json" in cleaned:
-            start = cleaned.index("```json") + 7
-            end = cleaned.index("```", start) if "```" in cleaned[start:] else len(cleaned)
-            cleaned = cleaned[start:end].strip()
+            match = re.search(r"```json\s*(.*?)\s*```", cleaned, re.DOTALL)
+            if match:
+                cleaned = match.group(1).strip()
         elif cleaned.startswith("```"):
             lines = cleaned.split("\n")
             lines = [l for l in lines if not l.strip().startswith("```")]
             cleaned = "\n".join(lines)
 
         # Try direct parse first
-        try:
-            data = json.loads(cleaned)
-        except json.JSONDecodeError:
-            # Extract JSON object with "category" key from text
-            # Handle multi-line JSON blocks
+        data = _try_parse_json(cleaned)
+
+        # Extract JSON object with "category" key from text
+        if data is None:
             json_match = re.search(r'\{[^{}]*?"category"\s*:\s*"[^"]+?"[^}]*?\}', cleaned, re.DOTALL)
             if json_match:
-                try:
-                    data = json.loads(json_match.group())
-                except json.JSONDecodeError:
-                    data = None
-            else:
-                data = None
+                data = _try_parse_json(json_match.group())
+
+        # Try finding any JSON object
+        if data is None:
+            json_match = re.search(r"\{.*?\"category\"\s*:.*?\}", cleaned, re.DOTALL)
+            if json_match:
+                data = _try_parse_json(json_match.group())
 
         if data is None:
-            logger.warning("Failed to parse Cloud.ru response: %s", raw[:200])
+            logger.error(
+                "Failed to parse Cloud.ru response. Raw (first 500 chars): %s",
+                raw[:500],
+            )
             return CategoryResult(category=CarCategory.CLEAN, confidence=0.3, flags=[], reasoning="parse error")
 
-        try:
-            category = CarCategory(data["category"])
-        except (KeyError, ValueError):
-            category = CarCategory.CLEAN
+        # Resolve category with fuzzy matching
+        raw_category = data.get("category", "clean")
+        category = resolve_category(str(raw_category))
 
         return CategoryResult(
             category=category,
@@ -207,6 +208,17 @@ class CloudRuCategorizer:
             flags=data.get("flags", []),
             reasoning=data.get("reasoning", ""),
         )
+
+
+def _try_parse_json(text: str) -> dict | None:
+    """Try to parse text as JSON, return None on failure."""
+    try:
+        result = json.loads(text)
+        if isinstance(result, dict):
+            return result
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return None
 
 
 def _compute_price_ratio(price: int | None, market_price: int | None) -> float | None:

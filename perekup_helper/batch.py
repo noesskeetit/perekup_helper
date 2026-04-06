@@ -1,10 +1,12 @@
-"""Batch processing для категоризации объявлений через OpenRouter."""
+"""Async batch processing для категоризации объявлений через OpenRouter."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import time
+import os
+import re
 
 import httpx
 
@@ -16,9 +18,11 @@ from perekup_helper.categorizer import (
     _compute_price_ratio,
 )
 from perekup_helper.models import (
+    CarCategory,
     CategoryResult,
     ListingDescription,
     ScoreResult,
+    resolve_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,7 +40,7 @@ BATCH_USER_PROMPT_TEMPLATE = """\
 [
   {{
     "id": "<id объявления>",
-    "category": "<одна из: clean, damaged_body, document_issues, owner_debtor, complex_profitable, junk>",
+    "category": "<одна из: clean, damaged_body, bad_docs, debtor, complex_but_profitable>",
     "confidence": <число от 0.0 до 1.0>,
     "flags": ["флаг1", "флаг2"],
     "reasoning": "<краткое обоснование, 1-2 предложения>"
@@ -48,7 +52,7 @@ ID должны совпадать с переданными."""
 
 
 class BatchProcessor:
-    """Групповая обработка объявлений через OpenRouter API."""
+    """Async групповая обработка объявлений через OpenRouter API."""
 
     def __init__(
         self,
@@ -67,8 +71,8 @@ class BatchProcessor:
         self._max_retries = max_retries
         self._single_categorizer = Categorizer(api_key=api_key, model=model)
 
-    def process(self, listings: list[ListingDescription]) -> list[ScoreResult]:
-        """Обработать список объявлений батчами."""
+    async def process(self, listings: list[ListingDescription]) -> list[ScoreResult]:
+        """Обработать список объявлений батчами (async)."""
         results: list[ScoreResult] = []
 
         for i in range(0, len(listings), self._batch_size):
@@ -81,7 +85,7 @@ class BatchProcessor:
             )
 
             try:
-                batch_results = self._process_batch(batch)
+                batch_results = await self._process_batch(batch)
                 results.extend(batch_results)
             except Exception:
                 logger.warning(
@@ -91,20 +95,20 @@ class BatchProcessor:
                 )
                 for listing in batch:
                     try:
-                        results.append(self._process_single(listing))
+                        results.append(await self._process_single(listing))
                     except Exception:
                         logger.warning("Не удалось категоризировать %s", listing.id, exc_info=True)
 
             if i + self._batch_size < len(listings):
-                time.sleep(self._rate_limit_delay)
+                await asyncio.sleep(self._rate_limit_delay)
 
         return results
 
-    def _process_batch(self, batch: list[ListingDescription]) -> list[ScoreResult]:
+    async def _process_batch(self, batch: list[ListingDescription]) -> list[ScoreResult]:
         listings_block = "\n\n".join(f"--- Объявление ID: {listing.id} ---\n{listing.text}" for listing in batch)
         prompt = BATCH_USER_PROMPT_TEMPLATE.format(count=len(batch), listings_block=listings_block)
 
-        raw_text = self._call_api_with_retry(prompt)
+        raw_text = await self._call_api_with_retry(prompt)
         category_map = self._parse_batch_response(raw_text)
 
         results: list[ScoreResult] = []
@@ -113,7 +117,7 @@ class BatchProcessor:
                 cat_result = category_map[listing.id]
             else:
                 logger.warning("ID %s не найден в ответе батча, fallback", listing.id)
-                cat_result = self._single_categorizer.categorize(listing)
+                cat_result = await self._single_categorizer.categorize(listing)
 
             price_ratio = _compute_price_ratio(listing.price, listing.market_price)
             score = _compute_attractiveness(cat_result, price_ratio)
@@ -128,10 +132,8 @@ class BatchProcessor:
 
         return results
 
-    def _call_api_with_retry(self, user_prompt: str) -> str:
-        """Call OpenRouter API with retry."""
-        import os
-
+    async def _call_api_with_retry(self, user_prompt: str) -> str:
+        """Call OpenRouter API with retry (async)."""
         api_key = self._api_key or os.environ.get("OPENROUTER_API_KEY", "")
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -139,61 +141,80 @@ class BatchProcessor:
         }
 
         last_exc: Exception | None = None
-        for attempt in range(1, self._max_retries + 1):
-            try:
-                response = httpx.post(
-                    OPENROUTER_URL,
-                    json={
-                        "model": self._model,
-                        "messages": [
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                        "max_tokens": self._max_tokens,
-                        "temperature": 0.1,
-                    },
-                    headers=headers,
-                    timeout=90,
-                )
-                response.raise_for_status()
-                data = response.json()
-                return data["choices"][0]["message"]["content"]
+        async with httpx.AsyncClient() as client:
+            for attempt in range(1, self._max_retries + 1):
+                try:
+                    response = await client.post(
+                        OPENROUTER_URL,
+                        json={
+                            "model": self._model,
+                            "messages": [
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {"role": "user", "content": user_prompt},
+                            ],
+                            "max_tokens": self._max_tokens,
+                            "temperature": 0.1,
+                        },
+                        headers=headers,
+                        timeout=90,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"]
 
-            except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 429:
-                    logger.warning("Rate limit (попытка %d/%d)", attempt, self._max_retries)
-                    time.sleep(self._rate_limit_delay * attempt * 3)
-                else:
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code == 429:
+                        logger.warning("Rate limit (попытка %d/%d)", attempt, self._max_retries)
+                        await asyncio.sleep(self._rate_limit_delay * attempt * 3)
+                    else:
+                        last_exc = exc
+                        logger.warning(
+                            "API ошибка %d (попытка %d/%d)", exc.response.status_code, attempt, self._max_retries
+                        )
+                        await asyncio.sleep(self._rate_limit_delay * attempt)
+                except Exception as exc:
                     last_exc = exc
-                    logger.warning("API ошибка %d (попытка %d/%d)", exc.response.status_code, attempt, self._max_retries)
-                    time.sleep(self._rate_limit_delay * attempt)
-            except Exception as exc:
-                last_exc = exc
-                logger.warning("Ошибка запроса (попытка %d/%d): %s", attempt, self._max_retries, exc)
-                time.sleep(self._rate_limit_delay * attempt)
+                    logger.warning("Ошибка запроса (попытка %d/%d): %s", attempt, self._max_retries, exc)
+                    await asyncio.sleep(self._rate_limit_delay * attempt)
 
         raise RuntimeError(f"Не удалось вызвать OpenRouter API за {self._max_retries} попыток") from last_exc
 
-    def _process_single(self, listing: ListingDescription) -> ScoreResult:
-        return self._single_categorizer.categorize_and_score(listing)
+    async def _process_single(self, listing: ListingDescription) -> ScoreResult:
+        return await self._single_categorizer.categorize_and_score(listing)
 
     @staticmethod
     def _parse_batch_response(raw: str) -> dict[str, CategoryResult]:
         cleaned = raw.strip()
-        if cleaned.startswith("```"):
+
+        # Remove markdown fences
+        if "```json" in cleaned:
+            match = re.search(r"```json\s*(.*?)\s*```", cleaned, re.DOTALL)
+            if match:
+                cleaned = match.group(1).strip()
+        elif cleaned.startswith("```"):
             lines = cleaned.split("\n")
             lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
-        if "```json" in cleaned:
-            start = cleaned.index("```json") + 7
-            end = cleaned.index("```", start) if "```" in cleaned[start:] else len(cleaned)
-            cleaned = cleaned[start:end].strip()
 
+        # Try direct parse
+        data = None
         try:
             data = json.loads(cleaned)
-        except json.JSONDecodeError as exc:
-            logger.error("Не удалось распарсить batch-ответ: %s", raw[:300])
-            raise ValueError(f"Невалидный batch JSON: {exc}") from exc
+        except json.JSONDecodeError:
+            # Try to find JSON array in the text
+            array_match = re.search(r"\[.*\]", cleaned, re.DOTALL)
+            if array_match:
+                try:
+                    data = json.loads(array_match.group())
+                except json.JSONDecodeError:
+                    pass
+
+        if data is None:
+            logger.error(
+                "Failed to parse batch response. Raw (first 500 chars): %s",
+                raw[:500],
+            )
+            raise ValueError(f"Невалидный batch JSON")
 
         if not isinstance(data, list):
             raise ValueError("Ожидался JSON-массив в batch-ответе")
@@ -201,7 +222,14 @@ class BatchProcessor:
         result: dict[str, CategoryResult] = {}
         for item in data:
             try:
-                cat_result = Categorizer._parse_response(json.dumps(item))
+                raw_category = item.get("category", "clean")
+                category = resolve_category(str(raw_category))
+                cat_result = CategoryResult(
+                    category=category,
+                    confidence=float(item.get("confidence", 0.5)),
+                    flags=item.get("flags", []),
+                    reasoning=item.get("reasoning", ""),
+                )
                 listing_id = item.get("id", "")
                 result[listing_id] = cat_result
             except (ValueError, KeyError) as exc:

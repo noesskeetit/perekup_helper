@@ -10,6 +10,26 @@ from app.routes.listings import router as listings_router
 from app.routes.stats import router as stats_router
 from app.scheduler import start_scheduler, stop_scheduler
 
+
+def _price_drop_info(listing) -> tuple[bool, float]:
+    """Return (price_dropped, price_drop_pct) from the most recent price_history entry.
+
+    price_drop_pct is positive when the price went down (e.g. 12.5 means -12.5%).
+    Returns (False, 0.0) when there is no history or the last change was not a drop.
+    """
+    raw = listing.raw_data if listing.raw_data else {}
+    history: list[dict] = raw.get("price_history", [])
+    if not history:
+        return False, 0.0
+    last_price = history[-1].get("price")
+    if last_price is None or last_price <= 0:
+        return False, 0.0
+    if listing.price >= last_price:
+        return False, 0.0
+    drop_pct = round((last_price - listing.price) / last_price * 100, 2)
+    return True, drop_pct
+
+
 BASE_DIR = Path(__file__).resolve().parent
 
 
@@ -108,23 +128,87 @@ async def hot_deals(
         result = await session.execute(stmt)
         listings = result.scalars().all()
 
-    return [
-        {
-            "brand": listing.brand,
-            "model": listing.model,
-            "year": listing.year,
-            "price": listing.price,
-            "market_price": listing.market_price,
-            "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
-            "city": listing.city,
-            "url": listing.url,
-            "source": listing.source,
-            "category": listing.analysis.category if listing.analysis else None,
-            "score": listing.analysis.score if listing.analysis else None,
-            "ai_summary": listing.analysis.ai_summary if listing.analysis else None,
-        }
-        for listing in listings
-    ]
+    results = []
+    for listing in listings:
+        dropped, drop_pct = _price_drop_info(listing)
+        results.append(
+            {
+                "brand": listing.brand,
+                "model": listing.model,
+                "year": listing.year,
+                "price": listing.price,
+                "market_price": listing.market_price,
+                "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
+                "city": listing.city,
+                "url": listing.url,
+                "source": listing.source,
+                "category": listing.analysis.category if listing.analysis else None,
+                "score": listing.analysis.score if listing.analysis else None,
+                "ai_summary": listing.analysis.ai_summary if listing.analysis else None,
+                "price_dropped": dropped,
+                "price_drop_pct": drop_pct,
+            }
+        )
+    return results
+
+
+@app.get("/api/price-drops")
+async def price_drops(
+    min_drop_pct: float = 1.0,
+    limit: int = 50,
+    city: str | None = None,
+):
+    """Listings with recent price drops, sorted by drop percentage (descending).
+
+    Only considers listings whose raw_data contains a price_history
+    and whose last price change was a decrease.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.db.session import async_session_factory
+    from app.models.listing import Listing
+
+    async with async_session_factory() as session:
+        stmt = (
+            select(Listing)
+            .options(selectinload(Listing.analysis))
+            .where(
+                Listing.is_duplicate.is_(False),
+                Listing.raw_data.isnot(None),
+            )
+        )
+        if city:
+            stmt = stmt.where(Listing.city.ilike(f"%{city}%"))
+        # Fetch a generous batch; filtering by JSON content happens in Python.
+        stmt = stmt.order_by(Listing.updated_at.desc()).limit(limit * 10)
+
+        result = await session.execute(stmt)
+        listings = result.scalars().all()
+
+    items = []
+    for listing in listings:
+        dropped, drop_pct = _price_drop_info(listing)
+        if not dropped or drop_pct < min_drop_pct:
+            continue
+        items.append(
+            {
+                "brand": listing.brand,
+                "model": listing.model,
+                "year": listing.year,
+                "price": listing.price,
+                "market_price": listing.market_price,
+                "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
+                "city": listing.city,
+                "url": listing.url,
+                "source": listing.source,
+                "category": listing.analysis.category if listing.analysis else None,
+                "price_dropped": True,
+                "price_drop_pct": drop_pct,
+            }
+        )
+    items.sort(key=lambda d: d["price_drop_pct"], reverse=True)
+    return items[:limit]
 
 
 @app.get("/api/top-deals")

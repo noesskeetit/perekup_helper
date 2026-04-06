@@ -174,44 +174,98 @@ _STEERING_MAP: dict[str, str] = {
     "rhd": SteeringWheel.RIGHT.value,
 }
 
-# Brand normalization — different sources use different names
+# Brand normalization — different sources use different names for the same brand.
+# Keys MUST be lowercase. Lookup is case-insensitive (see normalize_brand).
 _BRAND_MAP: dict[str, str] = {
-    "вaz": "LADA",
+    # ── LADA / ВАЗ ──────────────────────────────────────────────────────────
     "ваз": "LADA",
+    "вaz": "LADA",
     "лада": "LADA",
     "vaz": "LADA",
+    "lada": "LADA",
     "vaz_lada": "LADA",
     "vaz (lada)": "LADA",
+    "lada (ваз)": "LADA",
+    "lada (вaz)": "LADA",
     "лада (ваз)": "LADA",
     "ваз (lada)": "LADA",
+    "lada(ваз)": "LADA",
+    # ── UAZ / УАЗ ───────────────────────────────────────────────────────────
+    "уаз": "UAZ",
+    "uaz": "UAZ",
+    # ── GAZ / ГАЗ ───────────────────────────────────────────────────────────
+    "газ": "GAZ",
+    "gaz": "GAZ",
+    # ── ZAZ / ЗАЗ ───────────────────────────────────────────────────────────
+    "заз": "ZAZ",
+    "zaz": "ZAZ",
+    # ── Moskvitch / Москвич ──────────────────────────────────────────────────
+    "москвич": "Moskvitch",
+    # ── Hyundai (many Russian transliterations) ─────────────────────────────
+    "хёндэ": "Hyundai",
+    "хендай": "Hyundai",
+    "хендэ": "Hyundai",
+    "хундай": "Hyundai",
+    # ── Kia ──────────────────────────────────────────────────────────────────
+    "киа": "Kia",
+    "кия": "Kia",
+    # ── Japanese ─────────────────────────────────────────────────────────────
+    "тойота": "Toyota",
+    "ниссан": "Nissan",
+    "мазда": "Mazda",
+    "митсубиси": "Mitsubishi",
+    "мицубиси": "Mitsubishi",
+    "субару": "Subaru",
+    "сузуки": "Suzuki",
+    "хонда": "Honda",
+    "лексус": "Lexus",
+    "инфинити": "Infiniti",
+    "акура": "Acura",
+    # ── German ───────────────────────────────────────────────────────────────
     "мерседес": "Mercedes-Benz",
     "мерседес-бенц": "Mercedes-Benz",
     "бмв": "BMW",
     "фольксваген": "Volkswagen",
-    "тойота": "Toyota",
-    "хёндэ": "Hyundai",
-    "хендай": "Hyundai",
-    "хундай": "Hyundai",
-    "киа": "Kia",
-    "ниссан": "Nissan",
-    "рено": "Renault",
-    "форд": "Ford",
-    "мазда": "Mazda",
-    "шевроле": "Chevrolet",
     "шкода": "Skoda",
     "ауди": "Audi",
     "опель": "Opel",
+    "порше": "Porsche",
+    # ── Korean ───────────────────────────────────────────────────────────────
+    "дэу": "Daewoo",
+    "равон": "Ravon",
+    # ── French ───────────────────────────────────────────────────────────────
+    "рено": "Renault",
     "пежо": "Peugeot",
     "ситроен": "Citroen",
-    "субару": "Subaru",
-    "сузуки": "Suzuki",
-    "митсубиси": "Mitsubishi",
-    "хонда": "Honda",
-    "лексус": "Lexus",
-    "инфинити": "Infiniti",
-    "вольво": "Volvo",
+    # ── American ─────────────────────────────────────────────────────────────
+    "форд": "Ford",
+    "шевроле": "Chevrolet",
     "джип": "Jeep",
+    "додж": "Dodge",
+    "крайслер": "Chrysler",
+    "кадиллак": "Cadillac",
+    "линкольн": "Lincoln",
+    # ── British ──────────────────────────────────────────────────────────────
     "лэнд ровер": "Land Rover",
+    "ленд ровер": "Land Rover",
+    "ягуар": "Jaguar",
+    "бентли": "Bentley",
+    "роллс-ройс": "Rolls-Royce",
+    "мини": "MINI",
+    # ── Swedish / Other European ────────────────────────────────────────────
+    "вольво": "Volvo",
+    # ── Italian ──────────────────────────────────────────────────────────────
+    "феррари": "Ferrari",
+    "ламборгини": "Lamborghini",
+    # ── Chinese ──────────────────────────────────────────────────────────────
+    "чери": "Chery",
+    "черри": "Chery",
+    "хавал": "Haval",
+    "хавейл": "Haval",
+    "джили": "Geely",
+    "чанган": "Changan",
+    "грейт волл": "Great Wall",
+    "лифан": "Lifan",
 }
 
 # Drom subdomain → city name
@@ -255,19 +309,29 @@ def _norm(value: str | None, mapping: dict[str, str]) -> str | None:
 
 
 def normalize_brand(brand: str | None) -> str | None:
-    """Normalize brand name to canonical form."""
+    """Normalize brand name to canonical form.
+
+    Lookup order:
+    1. Exact match (case-insensitive) in _BRAND_MAP
+    2. Strip parenthetical suffix and retry — e.g. "Lada (ВАЗ)" → try "lada"
+    3. If still not found, title-case the original brand
+    """
     if not brand:
         return None
-    key = brand.strip().lower()
-    # Remove parenthetical parts: "ВАЗ (LADA)" → "ваз (lada)"
+    stripped = brand.strip()
+    key = stripped.lower()
+
+    # 1. Exact match
     if key in _BRAND_MAP:
         return _BRAND_MAP[key]
-    # Check partial matches
-    for pattern, canonical in _BRAND_MAP.items():
-        if pattern in key or key in pattern:
-            return canonical
-    # Title case fallback
-    return brand.strip().title() if brand.islower() else brand.strip()
+
+    # 2. Strip parenthetical part: "Lada (ВАЗ)" → "lada", "LADA (ВАЗ)" → "lada"
+    base = re.sub(r"\s*\(.*?\)\s*", "", key).strip()
+    if base and base != key and base in _BRAND_MAP:
+        return _BRAND_MAP[base]
+
+    # 3. Title-case fallback for unknown brands
+    return stripped.title()
 
 
 def normalize_listing(listing: ParsedListing) -> ParsedListing:

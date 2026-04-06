@@ -22,6 +22,14 @@ def _extract_brand_model(title: str) -> tuple[str, str]:
     # Strip mileage/year suffixes
     clean = re.split(r",\s*\d{4}", title)[0]
     clean = re.split(r"\d+\.\d+\s*(AT|MT|CVT|AMT)", clean)[0].strip()
+
+    # Handle "Brand (Alias) Model" pattern — keep parenthetical with brand
+    paren_match = re.match(r"^(.+?\([^)]+\))\s+(.*)", clean)
+    if paren_match:
+        brand = paren_match.group(1).strip()
+        model = paren_match.group(2).strip()
+        return brand, model
+
     parts = clean.split(None, 1)
     brand = parts[0] if parts else title
     model = parts[1] if len(parts) > 1 else ""

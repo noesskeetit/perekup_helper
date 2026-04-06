@@ -280,6 +280,7 @@ DROM_CITY_MAP: dict[str, str] = {
     "kazan": "Казань",
     "rostov": "Ростов-на-Дону",
     "nnovgorod": "Нижний Новгород",
+    "nizhniynovgorod": "Нижний Новгород",
     "chelyabinsk": "Челябинск",
     "voronezh": "Воронеж",
     "volgograd": "Волгоград",
@@ -356,9 +357,20 @@ def normalize_listing(listing: ParsedListing) -> ParsedListing:
 
 
 def extract_city_from_drom_url(url: str) -> str | None:
-    """Extract city name from Drom URL subdomain."""
-    m = re.match(r"https?://(\w+)\.drom\.ru/", url)
-    if m and m.group(1) != "auto":
-        subdomain = m.group(1)
+    """Extract city name from Drom URL.
+
+    Card URLs use the path: https://auto.drom.ru/CITY/brand/model/id.html
+    Listing URLs use subdomain: https://CITY.drom.ru/brand/...
+    """
+    # 1. Card URLs: auto.drom.ru/CITY/...
+    m_path = re.match(r"https?://auto\.drom\.ru/(\w+)/", url)
+    if m_path:
+        city_slug = m_path.group(1)
+        return DROM_CITY_MAP.get(city_slug, city_slug.title())
+
+    # 2. Listing URLs: CITY.drom.ru/...
+    m_sub = re.match(r"https?://(\w+)\.drom\.ru/", url)
+    if m_sub and m_sub.group(1) != "auto":
+        subdomain = m_sub.group(1)
         return DROM_CITY_MAP.get(subdomain, subdomain.title())
     return None

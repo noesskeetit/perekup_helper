@@ -167,27 +167,50 @@ class DromParser(BaseParser):
         return card_urls
 
     async def _fetch_card(self, client: httpx.AsyncClient, url: str) -> ParsedListing | None:
-        """Fetch a single card page and extract data from JSON-LD."""
+        """Fetch a single card page and extract data from JSON-LD + specs table."""
         resp = await client.get(url)
         if resp.status_code != 200:
             return None
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
+        # Extract specs from HTML table (always available)
+        specs = self._extract_specs_table(soup)
+
         # Try JSON-LD first (@type=Car)
         for script in soup.find_all("script", type="application/ld+json"):
             try:
                 data = json.loads(script.string or "")
                 if data.get("@type") == "Car":
-                    return self._parse_json_ld_car(data, url)
+                    return self._parse_json_ld_car(data, url, specs)
             except (json.JSONDecodeError, KeyError):
                 continue
 
         # Fallback: try __preloaded_state__
         return self._try_preloaded_state(resp.text, url)
 
-    def _parse_json_ld_car(self, data: dict, url: str) -> ParsedListing | None:
-        """Parse JSON-LD @type=Car into ParsedListing."""
+    @staticmethod
+    def _extract_specs_table(soup: BeautifulSoup) -> dict[str, str]:
+        """Extract specs key-value pairs from the HTML table on card pages."""
+        specs: dict[str, str] = {}
+        for table in soup.find_all("table"):
+            rows = table.find_all("tr")
+            if len(rows) < 4:
+                continue
+            for row in rows:
+                cells = row.find_all(["th", "td"])
+                if len(cells) == 2:
+                    key = cells[0].get_text(strip=True)
+                    value = cells[1].get_text(strip=True)
+                    if key:
+                        specs[key] = value
+        return specs
+
+    def _parse_json_ld_car(self, data: dict, url: str, specs: dict[str, str] | None = None) -> ParsedListing | None:
+        """Parse JSON-LD @type=Car + HTML specs table into ParsedListing."""
+        if specs is None:
+            specs = {}
+
         brand = data.get("brand", {}).get("name", "") if isinstance(data.get("brand"), dict) else str(data.get("brand", ""))
         model = str(data.get("model", ""))
         year = int(data.get("vehicleModelDate", 0) or 0)
@@ -221,10 +244,63 @@ class DromParser(BaseParser):
         if not external_id or not brand:
             return None
 
-        # Extract city from URL
+        # Extract city from URL (supports both card and listing URL formats)
         from app.parsers.normalizer import extract_city_from_drom_url
 
         city = extract_city_from_drom_url(url)
+
+        # VIN from JSON-LD
+        vin = data.get("vehicleIdentificationNumber")
+
+        # ── Extended fields from HTML specs table ──────────────────────────
+        # Engine: "бензин, 2.0 л"
+        engine_raw = specs.get("Двигатель", "")
+        engine_type = None
+        engine_volume = None
+        if engine_raw:
+            for part in engine_raw.split(","):
+                fuel = part.strip().lower()
+                if fuel in ("бензин", "дизель", "гибрид", "электро", "газ"):
+                    engine_type = part.strip()
+            vol_m = re.search(r"(\d+[.,]\d+)\s*л", engine_raw)
+            if vol_m:
+                engine_volume = float(vol_m.group(1).replace(",", "."))
+
+        # Power: "148 л.с.,налог" or "148 л.с."
+        power_hp = None
+        power_raw = specs.get("Мощность", "")
+        if power_raw:
+            pow_m = re.search(r"(\d+)\s*л\.?\s*с", power_raw)
+            if pow_m:
+                power_hp = int(pow_m.group(1))
+
+        # Transmission: "вариатор", "автомат", "механика"
+        transmission = specs.get("Коробка передач")
+
+        # Drive: "4WD", "передний", "задний", "полный"
+        drive_type = specs.get("Привод")
+
+        # Body type: "джип/suv 5 дв.", "седан", "хэтчбек"
+        body_type = specs.get("Тип кузова")
+
+        # Color
+        color = specs.get("Цвет")
+
+        # Steering wheel
+        steering = specs.get("Руль")
+
+        # Owners count: "4 и более", "1", "2"
+        owners_count = None
+        owners_raw = specs.get("Владельцы")
+        if owners_raw:
+            digits = re.sub(r"[^\d]", "", owners_raw)
+            owners_count = int(digits) if digits else None
+
+        # Generation
+        generation = specs.get("Поколение")
+
+        # Modification / trim
+        modification = specs.get("Комплектация")
 
         return ParsedListing(
             source="drom",
@@ -238,6 +314,19 @@ class DromParser(BaseParser):
             description=description,
             photos=[image_url] if image_url else [],
             city=city,
+            vin=vin,
+            engine_type=engine_type,
+            engine_volume=engine_volume,
+            power_hp=power_hp,
+            transmission=transmission,
+            drive_type=drive_type,
+            body_type=body_type,
+            color=color,
+            steering_wheel=steering,
+            owners_count=owners_count,
+            generation=generation,
+            modification=modification,
+            raw_data={"specs": specs} if specs else None,
         )
 
     def _try_preloaded_state(self, html: str, url: str) -> ParsedListing | None:

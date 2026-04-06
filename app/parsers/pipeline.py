@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 
 from app.parsers.avito import AvitoParser
@@ -69,15 +70,22 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
     async def _fetch_and_ingest(parser: BaseParser) -> ParseResult:
         source = parser.source_name
         logger.info("Pipeline: fetching from %s", source)
+        start = time.time()
         try:
             listings = await parser.fetch_listings()
-            logger.info("Pipeline: %s returned %d listings", source, len(listings))
-            return await ingest_listings(listings, source)
+            elapsed = time.time() - start
+            logger.info("Pipeline: %s returned %d listings in %.1fs", source, len(listings), elapsed)
+            pr = await ingest_listings(listings, source)
+            pr.elapsed_seconds = elapsed
+            # Extract captcha count from parser if available
+            if hasattr(parser, '_last_captcha_count'):
+                pr.captchas_hit = parser._last_captcha_count
+            return pr
         except Exception as exc:
             logger.exception("Pipeline: %s failed, changing IP and skipping", source)
             change_ip()
             result.errors.append(f"{source}: {exc}")
-            return ParseResult(source=source, errors=1)
+            return ParseResult(source=source, errors=1, elapsed_seconds=time.time() - start)
 
     parse_results = await asyncio.gather(*[_fetch_and_ingest(p) for p in parsers])
     for pr in parse_results:
@@ -121,6 +129,16 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
         except Exception as exc:
             logger.exception("Pipeline: analysis failed")
             result.errors.append(f"analysis: {exc}")
+
+    # Log per-source metrics
+    for pr in result.source_results:
+        lpb = pr.listings_per_ban
+        lpb_str = f"{lpb:.0f}" if lpb is not None else "inf"
+        logger.info(
+            "Pipeline [%s]: fetched=%d, new=%d, dupes=%d, time=%.1fs, captchas=%d, listings/ban=%s",
+            pr.source, pr.total_fetched, pr.new_saved, pr.duplicates_skipped,
+            pr.elapsed_seconds, pr.captchas_hit, lpb_str,
+        )
 
     logger.info(
         "Pipeline complete: new=%d, scored=%d, analyzed=%d, errors=%d",

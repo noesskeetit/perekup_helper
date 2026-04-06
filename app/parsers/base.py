@@ -57,6 +57,16 @@ class ParseResult:
     new_saved: int = 0
     duplicates_skipped: int = 0
     errors: int = 0
+    elapsed_seconds: float = 0.0
+    pages_fetched: int = 0
+    captchas_hit: int = 0
+
+    @property
+    def listings_per_ban(self) -> float | None:
+        """Key metric: how many listings we get per captcha/ban event."""
+        if self.captchas_hit == 0:
+            return None  # No bans — infinite efficiency
+        return self.total_fetched / self.captchas_hit
 
 
 class BaseParser(ABC):

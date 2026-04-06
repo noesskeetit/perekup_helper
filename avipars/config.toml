@@ -57,7 +57,7 @@ urls = [
     "https://www.avito.ru/chelyabinsk/avtomobili/toyota?cd=1&s=104",
     "https://www.avito.ru/chelyabinsk/avtomobili/kia?cd=1&s=104",
 ]
-count = 10
+count = 3
 keys_word_white_list = []
 keys_word_black_list = [
     "без ПТС",
@@ -81,7 +81,7 @@ geo = ""
 proxy_string = ""  # Set PROXY_STRING in .env
 proxy_change_url = ""  # Set PROXY_CHANGE_URL in .env
 pause_general = 300
-pause_between_links = 3
+pause_between_links = 2
 max_age = 0
 max_count_of_retry = 5
 ignore_reserv = true

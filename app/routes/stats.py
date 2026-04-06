@@ -64,10 +64,37 @@ async def stats_page(
         for row in brand_result.all()
     ]
 
+    # Coverage metrics
+    priced_result = await session.execute(
+        select(func.count(Listing.id)).where(Listing.market_price.isnot(None))
+    )
+    total_priced = priced_result.scalar() or 0
+
+    analyzed_result = await session.execute(select(func.count(ListingAnalysis.id)))
+    total_analyzed = analyzed_result.scalar() or 0
+
+    hot_deals_result = await session.execute(
+        select(func.count(Listing.id)).where(
+            Listing.price_diff_pct > 15, Listing.is_duplicate.is_(False)
+        )
+    )
+    hot_deals = hot_deals_result.scalar() or 0
+
+    dupes_result = await session.execute(
+        select(func.count(Listing.id)).where(Listing.is_duplicate.is_(True))
+    )
+    total_dupes = dupes_result.scalar() or 0
+
     ctx = {
         "request": request,
         "total": total,
         "total_unique": total_unique,
+        "total_dupes": total_dupes,
+        "total_priced": total_priced,
+        "total_analyzed": total_analyzed,
+        "hot_deals": hot_deals,
+        "priced_pct": round(total_priced / total * 100, 1) if total else 0,
+        "analyzed_pct": round(total_analyzed / total_unique * 100, 1) if total_unique else 0,
         "by_source": by_source,
         "by_category": by_category,
         "category_labels": CATEGORY_LABELS,

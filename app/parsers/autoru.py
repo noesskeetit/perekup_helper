@@ -172,6 +172,7 @@ class AutoruParser(BaseParser):
 
                 time.sleep(random.uniform(*self._pause_range))
 
+        self._last_captcha_count = captcha_count
         logger.info("AutoruParser fetched %d listings total (captchas hit: %d)", len(all_listings), captcha_count)
         return all_listings
 

@@ -13,8 +13,27 @@
         <div class="stats-card-label">Уникальных</div>
     </div>
     <div class="stats-card">
+        <div class="stats-card-value">{{ total_dupes }}</div>
+        <div class="stats-card-label">Дупликатов</div>
+    </div>
+    <div class="stats-card">
         <div class="stats-card-value">{{ "{:,.0f}".format(avg_price).replace(",", " ") }} ₽</div>
         <div class="stats-card-label">Средняя цена</div>
+    </div>
+</div>
+
+<div class="stats-cards">
+    <div class="stats-card">
+        <div class="stats-card-value">{{ total_priced }} <small>({{ priced_pct }}%)</small></div>
+        <div class="stats-card-label">С рыночной ценой</div>
+    </div>
+    <div class="stats-card">
+        <div class="stats-card-value">{{ total_analyzed }} <small>({{ analyzed_pct }}%)</small></div>
+        <div class="stats-card-label">AI проанализировано</div>
+    </div>
+    <div class="stats-card" style="border-left: 3px solid #22c55e;">
+        <div class="stats-card-value">{{ hot_deals }}</div>
+        <div class="stats-card-label">Hot deals (&gt;15% ниже рынка)</div>
     </div>
 </div>
 

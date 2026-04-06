@@ -28,10 +28,10 @@ jobs:
         run: pip install ".[dev]"
 
       - name: Ruff check
-        run: ruff check app/ bot/ avito_parser/ autoru_parser/ perekup_helper/ tests/
+        run: ruff check app/ perekup_helper/ tests/
 
       - name: Ruff format check
-        run: ruff format --check app/ bot/ avito_parser/ autoru_parser/ perekup_helper/ tests/
+        run: ruff format --check app/ perekup_helper/ tests/
 
   typecheck:
     name: Type check (mypy)
@@ -50,7 +50,7 @@ jobs:
         run: pip install ".[dev]"
 
       - name: Mypy
-        run: mypy app/ bot/ avito_parser/ perekup_helper/
+        run: mypy app/ perekup_helper/
         continue-on-error: true
 
   test:

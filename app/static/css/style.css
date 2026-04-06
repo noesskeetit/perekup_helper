@@ -151,7 +151,6 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     font-weight: 600;
 }
 .diff-good { background: var(--good-bg); color: var(--good); border: 1px solid var(--good-border); }
-.diff-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
 .diff-neutral { background: #f9fafb; color: var(--text-muted); border: 1px solid var(--border); }
 .diff-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-border); }
 
@@ -197,15 +196,6 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 .duplicate-list { list-style: none; padding: 0; margin: 0; }
 .duplicate-list li { padding: 4px 0; font-size: 0.9rem; }
 
-/* Score value */
-.score-value {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.85rem;
-    font-weight: 700;
-}
-.score-high { color: var(--good); background: var(--good-bg); border: 1px solid var(--good-border); }
 .score-mid { color: var(--warning); background: var(--warning-bg); border: 1px solid var(--warning-border); }
 .score-low { color: var(--bad); background: var(--bad-bg); border: 1px solid var(--bad-border); }
 
@@ -683,16 +673,22 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     .listing-row td:nth-child(3)::before { content: "Год: "; font-weight: 600; }
     .listing-row td:nth-child(4) {
         grid-column: 1 / -1;
+        font-size: 0.85rem;
+    }
+    .listing-row td:nth-child(4)::before { content: "Пробег: "; font-weight: 600; color: var(--text-muted); }
+    .listing-row td:nth-child(5) {
+        grid-column: 1 / -1;
         font-size: 1.1rem;
     }
-    .listing-row td:nth-child(5) {
+    .listing-row td:nth-child(6) {
         grid-column: 1 / -1;
         font-size: 0.85rem;
     }
-    .listing-row td:nth-child(5)::before { content: "Рыночная: "; font-weight: 600; color: var(--text-muted); }
-    .listing-row td:nth-child(6) { grid-column: 1 / -1; }
+    .listing-row td:nth-child(6)::before { content: "Рыночная: "; font-weight: 600; color: var(--text-muted); }
     .listing-row td:nth-child(7) { grid-column: 1 / -1; }
     .listing-row td:nth-child(8) { grid-column: 1 / -1; }
+    .listing-row td:nth-child(9) { grid-column: 1 / -1; }
+    .listing-row td:nth-child(10) { grid-column: 1 / -1; }
     .empty-row { display: block !important; }
 
     /* -- Detail modal fullscreen -- */

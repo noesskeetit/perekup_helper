@@ -91,7 +91,7 @@ async def test_diff_badges(async_client):
     resp = await async_client.get("/")
     html = resp.text
     # Sample data has price_diff_pct between -6.7 and -14.3 (all 5-15% below market → yellow)
-    assert "diff-warning" in html or "diff-good" in html or "diff-bad" in html
+    assert "diff-neutral" in html or "diff-good" in html or "diff-bad" in html
 
 
 @pytest.mark.asyncio

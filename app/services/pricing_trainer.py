@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 from sqlalchemy import select
@@ -62,7 +63,48 @@ async def train_model() -> dict:
         )
 
     df = pd.DataFrame(records)
-    logger.info("Training price model on %d listings", len(df))
+    total = len(df)
+    logger.info("Training price model on %d listings", total)
+
+    # --- Data cleaning ---
+    # 1. Remove stale listings (older than 60 days)
+    cutoff = datetime.now(UTC) - timedelta(days=60)
+    df["created_at"] = pd.to_datetime(df["created_at"], utc=True)
+    fresh_mask = df["created_at"] >= cutoff
+    stale_count = int((~fresh_mask).sum())
+    df = df[fresh_mask].copy()
+
+    # 2. IQR outlier removal per (brand, model) segment
+    outlier_count = 0
+    clean_parts: list[pd.DataFrame] = []
+    small_parts: list[pd.DataFrame] = []
+
+    for _key, group in df.groupby(["brand", "model"]):
+        if len(group) < 5:
+            small_parts.append(group)
+            continue
+        q1 = group["price"].quantile(0.25)
+        q3 = group["price"].quantile(0.75)
+        iqr = q3 - q1
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 3.0 * iqr  # asymmetric: tolerate high-end dealer markups
+        mask = (group["price"] >= lower) & (group["price"] <= upper)
+        outlier_count += int((~mask).sum())
+        clean_parts.append(group[mask])
+
+    df = pd.concat(clean_parts + small_parts, ignore_index=True)
+
+    logger.info(
+        "Removed %d stale, %d outliers from %d total (kept %d)",
+        stale_count,
+        outlier_count,
+        total,
+        len(df),
+    )
+
+    if df.empty:
+        logger.warning("No listings left after cleaning")
+        return {"status": "skipped", "reason": "no_data_after_cleaning"}
 
     model = get_price_model()
     stats = model.train(df)

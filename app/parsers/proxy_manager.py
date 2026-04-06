@@ -36,7 +36,7 @@ def change_ip() -> str | None:
         new_ip = data.get("new_ip")
         if new_ip:
             logger.info("Proxy IP changed to %s", new_ip)
-            time.sleep(5)  # Wait for IP to propagate
+            time.sleep(3)  # Wait for IP to propagate
             return new_ip
     except Exception:
         logger.warning("Failed to change proxy IP", exc_info=True)

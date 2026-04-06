@@ -70,7 +70,7 @@ class AutoruParser(BaseParser):
         self,
         searches: list[dict] | None = None,
         pages_per_search: int = 2,
-        pause_range: tuple[float, float] = (3.0, 5.0),
+        pause_range: tuple[float, float] = (2.0, 3.5),
     ):
         self._searches = searches or DEFAULT_SEARCHES
         self._pages = pages_per_search
@@ -246,6 +246,10 @@ class AutoruParser(BaseParser):
                 seller_m = re.search(r'"seller":\{[^}]*?"name":"([^"]+)"', chunk)
                 city_m = re.search(r'"city":"([^"]+)"', chunk)
                 region_m = re.search(r'"region_info":\{[^}]*?"name":"([^"]+)"', chunk)
+                # Auto.ru has no standalone "city" field; location is in region_info.name
+                # Fall back to region_info name as city when city regex misses
+                if not city_m and region_m:
+                    city_m = region_m
                 gen_m = re.search(r'"super_gen":\{[^}]*?"name":"([^"]+)"', chunk)
                 engine_vol_m = re.search(r'"engine_volume":(\d+)', chunk)
                 power_m = re.search(r'"engine_power":(\d+)', chunk)

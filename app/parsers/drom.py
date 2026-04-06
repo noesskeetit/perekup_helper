@@ -75,8 +75,8 @@ DEFAULT_URLS = [
     "https://rostov.drom.ru/toyota/?minprice=100000&maxprice=3000000",
     "https://rostov.drom.ru/kia/?minprice=100000&maxprice=3000000",
     # Nizhny Novgorod
-    "https://nizhniynovgorod.drom.ru/toyota/?minprice=100000&maxprice=3000000",
-    "https://nizhniynovgorod.drom.ru/lada/?minprice=100000&maxprice=3000000",
+    "https://nn.drom.ru/toyota/?minprice=100000&maxprice=3000000",
+    "https://nn.drom.ru/lada/?minprice=100000&maxprice=3000000",
 ]
 
 
@@ -96,9 +96,10 @@ class DromParser(BaseParser):
         urls: list[str] | None = None,
         pages_per_url: int = 3,
         max_cards_per_url: int = 30,
-        listing_pause: float = 1.5,
-        card_pause_range: tuple[float, float] = (0.5, 1.5),
-        concurrency: int = 3,
+        listing_pause: float = 1.0,
+        card_pause_range: tuple[float, float] = (0.3, 0.8),
+        concurrency: int = 5,
+        listing_concurrency: int = 3,
     ):
         self._urls = urls or DEFAULT_URLS
         self._pages = pages_per_url
@@ -106,6 +107,7 @@ class DromParser(BaseParser):
         self._listing_pause = listing_pause
         self._card_pause_range = card_pause_range
         self._concurrency = concurrency
+        self._listing_concurrency = listing_concurrency
 
     async def fetch_listings(self) -> list[ParsedListing]:
         """Fetch listings: collect card URLs from all listing pages, then
@@ -121,10 +123,16 @@ class DromParser(BaseParser):
             logger.info("Drom: using proxy %s", proxy_url.split("@")[-1] if "@" in proxy_url else "configured")
 
         async with httpx.AsyncClient(**client_kwargs) as client:
-            # Phase 1: collect ALL card URLs from all listing pages
+            # Phase 1: collect ALL card URLs from all listing pages (concurrent)
             all_card_urls: list[str] = []
-            for base_url in self._urls:
-                card_urls = await self._collect_card_urls(client, base_url)
+            listing_sem = asyncio.Semaphore(self._listing_concurrency)
+
+            async def _collect_one(base_url: str) -> list[str]:
+                async with listing_sem:
+                    return await self._collect_card_urls(client, base_url)
+
+            url_results = await asyncio.gather(*[_collect_one(u) for u in self._urls])
+            for card_urls in url_results:
                 for url in card_urls[: self._max_cards]:
                     m = BULL_URL_RE.search(url)
                     eid = m.group(1) if m else None
@@ -195,7 +203,7 @@ class DromParser(BaseParser):
                 logger.warning("Drom: failed to fetch listing page %s", url, exc_info=True)
                 break
 
-            await asyncio.sleep(random.uniform(1.0, self._listing_pause))
+            await asyncio.sleep(random.uniform(0.5, self._listing_pause))
 
         return card_urls
 

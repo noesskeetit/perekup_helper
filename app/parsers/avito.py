@@ -69,10 +69,11 @@ class AvitoParser(BaseParser):
 
     source_name = "avito"
 
-    def __init__(self, config_path: str = "avipars/config.toml", fetch_details: bool = True, detail_pause: float = 1.0):
+    def __init__(self, config_path: str = "avipars/config.toml", fetch_details: bool = True, detail_pause: float = 0.5, detail_concurrency: int = 3):
         self._config_path = config_path
         self._fetch_details = fetch_details
         self._detail_pause = detail_pause
+        self._detail_concurrency = detail_concurrency
 
     async def fetch_listings(self) -> list[ParsedListing]:
         """Run AviPars synchronously in a thread, then convert results."""
@@ -128,9 +129,11 @@ class AvitoParser(BaseParser):
         """Fetch detail pages and extract full specs.
 
         Skips detail fetch for listings whose external_id already exists in the
-        database, saving ~1s per known listing.
+        database, saving ~1s per known listing. Uses concurrent fetching with
+        a thread pool for parallel detail page downloads.
         """
         import time
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         from app.parsers.avito_detail import enrich_listing_from_detail
 
@@ -144,18 +147,25 @@ class AvitoParser(BaseParser):
                      len(need_enrichment), skipped)
         enriched = 0
 
-        for listing in need_enrichment:
+        def _fetch_one_detail(listing: ParsedListing) -> bool:
             if not listing.url:
-                continue
+                return False
             try:
                 html = avito_parser.fetch_data(url=listing.url)
                 if html:
                     enrich_listing_from_detail(listing, html)
-                    enriched += 1
+                    return True
             except Exception:
                 logger.debug("Failed to enrich %s", listing.external_id, exc_info=True)
-
             time.sleep(self._detail_pause)
+            return False
+
+        # Concurrent detail fetching with limited parallelism
+        with ThreadPoolExecutor(max_workers=self._detail_concurrency) as executor:
+            futures = {executor.submit(_fetch_one_detail, l): l for l in need_enrichment}
+            for future in as_completed(futures):
+                if future.result():
+                    enriched += 1
 
         logger.info("Enriched %d/%d listings with detail data", enriched, len(need_enrichment))
         return listings

@@ -72,12 +72,16 @@ async def analyze_new_listings(limit: int = 50) -> int:
                 )
             )
 
-        # Run categorization — Cloud.ru FM (primary) or OpenRouter (fallback)
+        # Run categorization — provider selected by AI_PROVIDER setting
         from app.config import settings
 
         score_results = []
         try:
-            if settings.cloudru_fm_api_key:
+            use_cloudru = (
+                settings.ai_provider == "cloudru"
+                and settings.cloudru_fm_api_key
+            )
+            if use_cloudru:
                 from perekup_helper.cloudru_client import CloudRuCategorizer
 
                 categorizer = CloudRuCategorizer(api_key=settings.cloudru_fm_api_key)
@@ -87,7 +91,7 @@ async def analyze_new_listings(limit: int = 50) -> int:
                         score_results.append(sr)
                     except Exception:
                         logger.warning("Cloud.ru categorization failed for %s", desc.id, exc_info=True)
-                    await asyncio.sleep(1)  # rate limit safety
+                    await asyncio.sleep(1)
             else:
                 api_key = settings.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY", "")
                 model = settings.openrouter_model or "qwen/qwen3.6-plus:free"

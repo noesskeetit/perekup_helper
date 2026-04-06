@@ -34,17 +34,11 @@ CLOUDRU_API_URL = os.environ.get(
 )
 
 CATEGORIZE_PROMPT = """\
-Категоризируй авто-объявление. Ответь ТОЛЬКО JSON без markdown:
-{{"category": "<clean|damaged_body|bad_docs|debtor|complex_but_profitable>", "confidence": <0.0-1.0>, "flags": ["флаг1", "флаг2"], "reasoning": "<1-2 предложения>"}}
+Категоризируй авто. JSON, без markdown:
+{{"category":"clean|damaged_body|bad_docs|debtor|complex_but_profitable","confidence":0.0-1.0,"flags":[],"reasoning":"кратко"}}
 
-Категории:
-- clean: чистые документы, нормальный кузов
-- damaged_body: серьёзные повреждения кузова
-- bad_docs: нет ПТС, запрет регистрации
-- debtor: кредиты, залог, арест
-- complex_but_profitable: цена ниже рынка, но нужно повозиться
+clean=ок, damaged_body=битая, bad_docs=нет ПТС, debtor=залог/арест, complex_but_profitable=дешево но сложно.
 
-Объявление:
 {text}"""
 
 DESCRIBE_IMAGE_PROMPT = "Опиши автомобиль на фото кратко: состояние кузова, видимые повреждения, цвет, тип кузова. 2-3 предложения."
@@ -145,14 +139,23 @@ class CloudRuCategorizer:
                     # GLM-4.7 is a thinking model: final JSON in content, chain-of-thought in reasoning
                     content = choice.get("content") or ""
                     reasoning = choice.get("reasoning") or ""
-                    # Prefer content if it looks like JSON, otherwise extract JSON from reasoning
-                    if content and ("{" in content):
-                        return content
-                    if reasoning and ("{" in reasoning):
-                        # Extract last JSON block from reasoning
-                        json_blocks = re.findall(r'\{[^{}]*"category"[^{}]*\}', reasoning, re.DOTALL)
-                        if json_blocks:
-                            return json_blocks[-1]
+                    # Check both fields for JSON with "category" key
+                    for text in [content, reasoning]:
+                        if text and '"category"' in text:
+                            # Find JSON object containing "category"
+                            start = text.find("{")
+                            if start >= 0:
+                                # Find matching closing brace
+                                depth = 0
+                                for i, ch in enumerate(text[start:], start):
+                                    if ch == "{":
+                                        depth += 1
+                                    elif ch == "}":
+                                        depth -= 1
+                                        if depth == 0:
+                                            return text[start : i + 1]
+                                # No matching brace — return from { to end (truncated)
+                                return text[start:]
                     return content or reasoning
                 except Exception as e:
                     logger.warning("Cloud.ru API error (attempt %d): %s", attempt + 1, e)
@@ -211,13 +214,29 @@ class CloudRuCategorizer:
 
 
 def _try_parse_json(text: str) -> dict | None:
-    """Try to parse text as JSON, return None on failure."""
+    """Try to parse text as JSON, with repair for truncated responses."""
+    # Direct parse
     try:
         result = json.loads(text)
         if isinstance(result, dict):
             return result
     except (json.JSONDecodeError, ValueError):
         pass
+
+    # Try to repair truncated JSON (missing closing braces/quotes)
+    repaired = text.rstrip()
+    if repaired and not repaired.endswith("}"):
+        # Truncated string value — close the quote and brace
+        if repaired.count('"') % 2 != 0:
+            repaired += '"'
+        repaired += "}"
+        try:
+            result = json.loads(repaired)
+            if isinstance(result, dict):
+                return result
+        except (json.JSONDecodeError, ValueError):
+            pass
+
     return None
 
 

@@ -118,14 +118,17 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
             logger.exception("Pipeline: price scoring failed")
             result.errors.append(f"pricing: {exc}")
 
-    # Step 4: AI categorization
+    # Step 4: AI categorization (auto-scaling worker pool)
     if result.total_new > 0:
         try:
-            from app.parsers.analyzer import analyze_new_listings
+            from app.services.analysis_pool import run_analysis_pool
 
-            analyzed = await analyze_new_listings(limit=result.total_new + 10)
-            result.total_analyzed = analyzed
-            logger.info("Pipeline: analyzed %d listings", analyzed)
+            pool_result = await run_analysis_pool(max_total=result.total_new + 50)
+            result.total_analyzed = pool_result["analyzed"]
+            logger.info(
+                "Pipeline: analyzed %d listings via %d workers",
+                pool_result["analyzed"], pool_result["workers"],
+            )
         except Exception as exc:
             logger.exception("Pipeline: analysis failed")
             result.errors.append(f"analysis: {exc}")

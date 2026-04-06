@@ -64,6 +64,14 @@ async def retrain_model_now():
     return {"training": stats, "scored": scored}
 
 
+@app.post("/api/run-analysis")
+async def run_analysis_now(max_total: int = 2000):
+    """Run auto-scaling AI analysis pool on backlog."""
+    from app.services.analysis_pool import run_analysis_pool
+
+    return await run_analysis_pool(max_total=max_total)
+
+
 @app.get("/api/model-info")
 async def model_info():
     """Get current price model metadata."""

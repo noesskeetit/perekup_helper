@@ -20,6 +20,7 @@
             {{ sort_header("price_diff_pct", "vs Рынок") }}
             {{ sort_header("category", "Категория") }}
             <th>Скор</th>
+            {{ sort_header("age", "Возраст") }}
             <th>Источник</th>
         </tr>
     </thead>
@@ -100,6 +101,10 @@
                 <span class="muted">&mdash;</span>
                 {% endif %}
             </td>
+            {% set age_label, age_class = listing.created_at | listing_age %}
+            <td>
+                <span class="age-badge {{ age_class }}">{{ age_label }}</span>
+            </td>
             <td>
                 <a href="{{ listing.url }}" target="_blank" rel="noopener" class="source-link" onclick="event.stopPropagation()">
                     {{ listing.source }}
@@ -108,7 +113,7 @@
         </tr>
         {% else %}
         <tr>
-            <td colspan="10" class="empty-row">Объявления не найдены</td>
+            <td colspan="11" class="empty-row">Объявления не найдены</td>
         </tr>
         {% endfor %}
     </tbody>

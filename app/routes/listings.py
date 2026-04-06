@@ -1,4 +1,5 @@
 import uuid as _uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -13,6 +14,25 @@ from app.models.listing import Listing, ListingAnalysis
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
+
+
+def _listing_age(created_at: datetime | None) -> tuple[str, str]:
+    """Return (label, css_class) for a listing's age."""
+    if created_at is None:
+        return ("—", "age-old")
+    now = datetime.now(UTC)
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    delta = now - created_at
+    hours = delta.total_seconds() / 3600
+    if hours < 1:
+        return ("< 1ч", "age-fresh")
+    if hours < 24:
+        return ("< 24ч", "age-recent")
+    return ("> 24ч", "age-old")
+
+
+templates.env.filters["listing_age"] = _listing_age
 
 CATEGORY_LABELS = {
     "clean": "Чистая",
@@ -31,6 +51,7 @@ SORT_COLUMNS = {
     "category": ListingAnalysis.category,
     "confidence": ListingAnalysis.confidence,
     "created_at": Listing.created_at,
+    "age": Listing.created_at,
 }
 
 

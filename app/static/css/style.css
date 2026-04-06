@@ -439,6 +439,19 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 .score-mid { background: #fefce8; color: #ca8a04; border: 1px solid #fef08a; }
 .score-low { background: #f9fafb; color: #9ca3af; border: 1px solid #e5e7eb; }
 
+/* Age badge */
+.age-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.age-fresh { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.age-recent { background: #fefce8; color: #ca8a04; border: 1px solid #fef08a; }
+.age-old { background: #f9fafb; color: #9ca3af; border: 1px solid #e5e7eb; }
+
 /* Hot deal diff badge */
 .diff-hot { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700; }
 .diff-ok { background: #f0fdf4; color: #22c55e; border: 1px solid #bbf7d0; }
@@ -689,6 +702,7 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
     .listing-row td:nth-child(8) { grid-column: 1 / -1; }
     .listing-row td:nth-child(9) { grid-column: 1 / -1; }
     .listing-row td:nth-child(10) { grid-column: 1 / -1; }
+    .listing-row td:nth-child(11) { grid-column: 1 / -1; }
     .empty-row { display: block !important; }
 
     /* -- Detail modal fullscreen -- */

@@ -2,6 +2,11 @@
 
 - train_model(): fetch all listings from DB, train CatBoost, save model
 - score_listings(): apply model to unscored listings, update market_price + price_diff_pct
+
+Outlier removal (v2):
+  - IQR bounds tightened to 1.5x on both sides (was asymmetric 1.5/3.0).
+  - Secondary MAD filter on log(price) per segment removes mis-priced listings
+    that survive IQR (e.g., a 2M car listed at 200K by mistake).
 """
 
 from __future__ import annotations
@@ -10,6 +15,7 @@ import logging
 import math
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 import pandas as pd
 from sqlalchemy import select
 
@@ -76,7 +82,7 @@ async def train_model() -> dict:
     stale_count = int((~fresh_mask).sum())
     df = df[fresh_mask].copy()
 
-    # 2. IQR outlier removal per (brand, model) segment
+    # 2. IQR outlier removal per (brand, model) segment — symmetric 1.5x bounds
     outlier_count = 0
     clean_parts: list[pd.DataFrame] = []
     small_parts: list[pd.DataFrame] = []
@@ -89,17 +95,42 @@ async def train_model() -> dict:
         q3 = group["price"].quantile(0.75)
         iqr = q3 - q1
         lower = q1 - 1.5 * iqr
-        upper = q3 + 3.0 * iqr  # asymmetric: tolerate high-end dealer markups
+        upper = q3 + 1.5 * iqr
         mask = (group["price"] >= lower) & (group["price"] <= upper)
         outlier_count += int((~mask).sum())
         clean_parts.append(group[mask])
 
     df = pd.concat(clean_parts + small_parts, ignore_index=True)
 
+    # 3. MAD-based secondary filter on log(price) per (brand, model) segment.
+    #    Catches mis-priced listings that survive IQR (e.g., typos, test listings).
+    mad_outlier_count = 0
+    mad_clean_parts: list[pd.DataFrame] = []
+
+    for _key, group in df.groupby(["brand", "model"]):
+        if len(group) < 10:
+            mad_clean_parts.append(group)
+            continue
+        log_prices = np.log(group["price"].values.astype(float))
+        median_log = float(np.median(log_prices))
+        mad = float(np.median(np.abs(log_prices - median_log)))
+        if mad < 1e-9:
+            # All prices nearly identical — keep everything
+            mad_clean_parts.append(group)
+            continue
+        # Modified Z-score: |log_price - median| / MAD > 3.5 is an outlier
+        z_scores = np.abs(log_prices - median_log) / mad
+        mask = z_scores <= 3.5
+        mad_outlier_count += int((~mask).sum())
+        mad_clean_parts.append(group[mask])
+
+    df = pd.concat(mad_clean_parts, ignore_index=True)
+
     logger.info(
-        "Removed %d stale, %d outliers from %d total (kept %d)",
+        "Removed %d stale, %d IQR outliers, %d MAD outliers from %d total (kept %d)",
         stale_count,
         outlier_count,
+        mad_outlier_count,
         total,
         len(df),
     )

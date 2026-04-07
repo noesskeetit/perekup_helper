@@ -554,8 +554,10 @@ class TestMAPECalculation:
     """Verify PriceModel.train() returns MAPE metrics in the expected format.
 
     The MAPE formula (np.mean(np.abs((y_true - y_pred) / y_true)) * 100) is
-    computed inline in PriceModel.train() (line 143 of pricing.py).
-    We verify it by training with mocked CatBoost that returns known predictions.
+    computed inline in PriceModel.train().
+
+    Note: P50 now trains on log(price) and converts back via exp(), so mocked
+    predictions must be in log-space for P50 and raw price for P10/P90.
     """
 
     def test_train_returns_mape_in_stats(self):
@@ -565,8 +567,14 @@ class TestMAPECalculation:
 
         with patch("app.services.pricing.CatBoostRegressor") as mock_cb_cls:
             mock_cb = MagicMock()
-            # predict returns the actual prices (perfect prediction => MAPE = 0)
-            mock_cb.predict.side_effect = lambda X: X.iloc[:, X.columns.get_loc("mileage")].values * 0 + 1_500_000
+            # For P50 (log-target): return log of a constant price
+            # For P10/P90 (raw price): return a constant price
+            # The mock is used for all 3 quantiles, so we return a value that
+            # works for both: log(1_500_000) ~ 14.22 for P50, 1_500_000 for P10/P90.
+            # Since we can't distinguish which quantile calls predict(), return
+            # log(1_500_000) — P50 will exp() it back, P10/P90 MAPE will be off
+            # but the test only checks P50 is present and non-negative.
+            mock_cb.predict.return_value = np.full(60, np.log(1_500_000))
             mock_cb.get_feature_importance.return_value = np.ones(len(model._feature_names))
             mock_cb_cls.return_value = mock_cb
 
@@ -589,10 +597,12 @@ class TestMAPECalculation:
 
         with patch("app.services.pricing.CatBoostRegressor") as mock_cb_cls, patch("app.services.pricing.Pool"):
             mock_cb = MagicMock()
-            # Return exact actual prices for the validation set (last 20%)
+            # P50 trains on log(price), so return log(actual) for perfect match.
+            # For P10/P90, returning log(actual) gives wrong MAPE, but we only
+            # assert on P50 below.
             split_idx = int(len(prepared) * 0.8)
             val_prices = actual_prices[split_idx:]
-            mock_cb.predict.return_value = val_prices
+            mock_cb.predict.return_value = np.log(val_prices)
             mock_cb.get_feature_importance.return_value = np.ones(len(model._feature_names))
             mock_cb_cls.return_value = mock_cb
 

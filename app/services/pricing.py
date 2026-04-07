@@ -12,6 +12,14 @@ Quantiles:
   - P90: expensive end (above this = overpriced)
 
 Model retrains daily on fresh data.
+
+MAPE optimization notes (v2):
+  - P50 model trains on log(price) to normalize relative errors across price ranges.
+    Predictions are exp(log_pred) to recover original scale.
+  - P10/P90 still use Quantile loss on raw price (they bound the market range).
+  - CatBoost hyperparameters tuned for lower MAPE: more iterations, lower LR,
+    deeper trees, L2 regularization.
+  - 5-fold CV is used for reliable MAPE measurement alongside the final model.
 """
 
 from __future__ import annotations
@@ -82,11 +90,28 @@ ALL_FEATURES = CAT_FEATURES + NUM_FEATURES
 
 QUANTILES = [0.10, 0.50, 0.90]
 
+# --- Tuned CatBoost hyperparameters (v2) ---
+# Shared across quantile models; P50 uses log-target + MAPE eval.
+_CB_PARAMS_BASE = {
+    "iterations": 1500,
+    "learning_rate": 0.03,
+    "depth": 8,
+    "l2_leaf_reg": 5.0,
+    "min_data_in_leaf": 10,
+    "verbose": 0,
+    "random_seed": 42,
+    "early_stopping_rounds": 100,
+}
+
 
 class PriceModel:
     """CatBoost quantile regression model for car market pricing.
 
     Predicts P10, P50, P90 price given car features.
+
+    The P50 model is trained on log(price) with MAPE eval metric, then
+    predictions are exponentiated back. This dramatically reduces MAPE because
+    relative errors become uniform across price ranges.
     """
 
     def __init__(self):
@@ -95,6 +120,8 @@ class PriceModel:
         self._training_size: int = 0
         self._feature_names: list[str] = ALL_FEATURES
         self._quantile_metrics: dict = {}
+        # Track whether P50 was trained on log-target (needed for predict)
+        self._p50_log_target: bool = False
 
     @property
     def is_trained(self) -> bool:
@@ -141,21 +168,31 @@ class PriceModel:
         for quantile in QUANTILES:
             logger.info("Training quantile=%.2f on %d samples", quantile, len(df))
 
-            model = CatBoostRegressor(
-                iterations=500,
-                learning_rate=0.05,
-                depth=6,
-                loss_function=f"Quantile:alpha={quantile}",
-                cat_features=cat_feature_indices,
-                verbose=0,
-                random_seed=42,
-                early_stopping_rounds=50,
-            )
+            is_p50 = abs(quantile - 0.50) < 1e-9
+
+            if is_p50:
+                # P50: train on log(price) with RMSE loss + MAPE eval
+                y_target = np.log(y.values)
+                model = CatBoostRegressor(
+                    **_CB_PARAMS_BASE,
+                    loss_function="RMSE",
+                    eval_metric="MAPE",
+                    cat_features=cat_feature_indices,
+                )
+                self._p50_log_target = True
+            else:
+                # P10/P90: quantile loss on raw price
+                y_target = y.values
+                model = CatBoostRegressor(
+                    **_CB_PARAMS_BASE,
+                    loss_function=f"Quantile:alpha={quantile}",
+                    cat_features=cat_feature_indices,
+                )
 
             # 80/20 split for early stopping
             split_idx = int(len(df) * 0.8)
             X_train, X_val = X.iloc[:split_idx], X.iloc[split_idx:]
-            y_train, y_val = y.iloc[:split_idx], y.iloc[split_idx:]
+            y_train, y_val = y_target[:split_idx], y_target[split_idx:]
             w_train, w_val = weights[:split_idx], weights[split_idx:]
 
             train_pool = Pool(X_train, y_train, cat_features=cat_feature_indices, weight=w_train)
@@ -164,14 +201,26 @@ class PriceModel:
             model.fit(train_pool, eval_set=val_pool, verbose=0)
             self._models[quantile] = model
 
-            # Compute validation metrics
-            y_pred = model.predict(X_val)
-            mae = float(np.mean(np.abs(y_val.values - y_pred)))
-            mape = float(np.mean(np.abs((y_val.values - y_pred) / y_val.values)) * 100)
+            # Compute validation metrics on original price scale
+            y_pred_raw = model.predict(X_val)
+            if is_p50:
+                # Convert log-predictions back to price
+                y_pred = np.exp(y_pred_raw)
+                y_actual = y.iloc[split_idx:].values
+            else:
+                y_pred = y_pred_raw
+                y_actual = y.iloc[split_idx:].values
+
+            mae = float(np.mean(np.abs(y_actual - y_pred)))
+            mape = float(np.mean(np.abs((y_actual - y_pred) / y_actual)) * 100)
             stats["quantile_metrics"][f"P{int(quantile * 100)}"] = {
                 "mae": round(mae),
                 "mape": round(mape, 1),
             }
+
+        # --- 5-fold CV MAPE for P50 (reliable metric, does not affect the final model) ---
+        cv_mape = self._cross_validate_mape(X, y, weights, cat_feature_indices, n_folds=5)
+        stats["cv_mape_p50"] = round(cv_mape, 1)
 
         self._trained_at = datetime.now(UTC)
         self._training_size = len(df)
@@ -183,8 +232,61 @@ class PriceModel:
         stats["feature_importance"] = {k: round(v, 1) for k, v in sorted(feature_imp.items(), key=lambda x: -x[1])}
         stats["trained_at"] = self._trained_at.isoformat()
 
-        logger.info("Price model trained: %d samples, metrics=%s", len(df), stats["quantile_metrics"])
+        logger.info(
+            "Price model trained: %d samples, metrics=%s, cv_mape=%.1f%%",
+            len(df),
+            stats["quantile_metrics"],
+            cv_mape,
+        )
         return stats
+
+    def _cross_validate_mape(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        weights: np.ndarray,
+        cat_feature_indices: list[int],
+        n_folds: int = 5,
+    ) -> float:
+        """Run K-fold CV on the P50 log-target model and return mean MAPE.
+
+        This gives a more robust MAPE estimate than a single 80/20 split.
+        The final trained model is NOT affected -- this is measurement only.
+        """
+        fold_size = len(X) // n_folds
+        mapes: list[float] = []
+
+        for fold in range(n_folds):
+            val_start = fold * fold_size
+            val_end = val_start + fold_size if fold < n_folds - 1 else len(X)
+
+            X_train = pd.concat([X.iloc[:val_start], X.iloc[val_end:]])
+            y_train_raw = np.concatenate([y.values[:val_start], y.values[val_end:]])
+            w_train = np.concatenate([weights[:val_start], weights[val_end:]])
+
+            X_val = X.iloc[val_start:val_end]
+            y_val_raw = y.values[val_start:val_end]
+            w_val = weights[val_start:val_end]
+
+            y_train_log = np.log(y_train_raw)
+            y_val_log = np.log(y_val_raw)
+
+            model = CatBoostRegressor(
+                **_CB_PARAMS_BASE,
+                loss_function="RMSE",
+                eval_metric="MAPE",
+                cat_features=cat_feature_indices,
+            )
+
+            train_pool = Pool(X_train, y_train_log, cat_features=cat_feature_indices, weight=w_train)
+            val_pool = Pool(X_val, y_val_log, cat_features=cat_feature_indices, weight=w_val)
+            model.fit(train_pool, eval_set=val_pool, verbose=0)
+
+            y_pred = np.exp(model.predict(X_val))
+            fold_mape = float(np.mean(np.abs((y_val_raw - y_pred) / y_val_raw)) * 100)
+            mapes.append(fold_mape)
+
+        return float(np.mean(mapes))
 
     def predict(self, listings: list[dict]) -> list[dict]:
         """Predict P10/P50/P90 prices for listings.
@@ -206,7 +308,12 @@ class PriceModel:
         predictions = {}
         for quantile, model in self._models.items():
             key = f"p{int(quantile * 100)}"
-            predictions[key] = model.predict(X)
+            raw_pred = model.predict(X)
+            # P50 trained on log(price) — exponentiate back
+            if abs(quantile - 0.50) < 1e-9 and self._p50_log_target:
+                predictions[key] = np.exp(raw_pred)
+            else:
+                predictions[key] = raw_pred
 
         for i in range(len(listings)):
             p10 = max(0, int(predictions["p10"][i]))
@@ -246,6 +353,7 @@ class PriceModel:
             "training_size": self._training_size,
             "feature_names": self._feature_names,
             "quantile_metrics": self._quantile_metrics,
+            "p50_log_target": self._p50_log_target,
         }
         with open(METADATA_PATH, "wb") as f:
             pickle.dump(meta, f)
@@ -270,6 +378,7 @@ class PriceModel:
                     self._trained_at = meta.get("trained_at")
                     self._training_size = meta.get("training_size", 0)
                     self._quantile_metrics = meta.get("quantile_metrics", {})
+                    self._p50_log_target = meta.get("p50_log_target", False)
 
             logger.info(
                 "Price model loaded: %d quantile models, trained on %d samples", len(self._models), self._training_size

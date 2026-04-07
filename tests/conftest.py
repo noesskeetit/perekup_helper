@@ -283,7 +283,7 @@ def _make_async_listings():
             confidence=0.95,
             ai_summary="Один владелец, без ДТП",
             flags=None,
-            score=7.5,
+            score=75.0,
         ),
         ListingAnalysis(
             id=uuid.uuid4(),
@@ -292,6 +292,7 @@ def _make_async_listings():
             confidence=0.88,
             ai_summary="Хорошее состояние",
             flags=None,
+            score=45.0,
         ),
         ListingAnalysis(
             id=uuid.uuid4(),
@@ -300,6 +301,7 @@ def _make_async_listings():
             confidence=0.82,
             ai_summary="Повреждения кузова",
             flags=["после ДТП"],
+            score=20.0,
         ),
         ListingAnalysis(
             id=uuid.uuid4(),
@@ -308,6 +310,7 @@ def _make_async_listings():
             confidence=0.92,
             ai_summary="Гаражное хранение",
             flags=None,
+            score=60.0,
         ),
         ListingAnalysis(
             id=uuid.uuid4(),
@@ -316,6 +319,7 @@ def _make_async_listings():
             confidence=0.75,
             ai_summary="Требует вложений",
             flags=["износ"],
+            score=15.0,
         ),
     ]
 

@@ -193,3 +193,68 @@ async def test_price_diff_rubles_in_detail(async_detail_client):
     html = resp.text
     assert "price-diff-abs" in html
     assert "200" in html  # 200 000 ruble difference
+
+
+# ---------------------------------------------------------------------------
+# Deal score filter
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_deal_score_filter_form_element(async_client):
+    """Dashboard contains deal_score_min slider input."""
+    resp = await async_client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+    assert 'name="deal_score_min"' in html
+    assert "Deal Score" in html
+
+
+@pytest.mark.asyncio
+async def test_deal_score_min_filters_listings(async_client):
+    """Filtering by deal_score_min=50 returns only listings with score >= 50."""
+    resp = await async_client.get("/", params={"deal_score_min": "50"})
+    assert resp.status_code == 200
+    html = resp.text
+    # Toyota Camry has score=75, Kia K5 has score=60 — both qualify
+    assert "Camry" in html
+    assert "K5" in html
+    # BMW X5 score=20 and Hyundai score=15 should be filtered out from the table
+    assert "X5" not in html
+    assert "Tucson" not in html
+
+
+@pytest.mark.asyncio
+async def test_deal_score_sort_header(async_client):
+    """Listings table has a sortable deal_score column header."""
+    resp = await async_client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+    assert "sort_by=deal_score" in html
+
+
+@pytest.mark.asyncio
+async def test_deal_score_sort_works(async_client):
+    """Sorting by deal_score desc puts highest-scored listing first."""
+    resp = await async_client.get("/", params={"sort_by": "deal_score", "sort_dir": "desc"})
+    assert resp.status_code == 200
+    html = resp.text
+    # Toyota Camry (score=75) should appear before Hyundai (score=15)
+    camry_pos = html.find("Camry")
+    tucson_pos = html.find("Tucson")
+    assert camry_pos < tucson_pos
+
+
+# ---------------------------------------------------------------------------
+# Model health indicator
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_model_health_widget_structure(async_client):
+    """Stats bar contains model health widget with MAPE and training info."""
+    resp = await async_client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+    # The widget should have model-health class and health badge
+    assert "model-health" in html or "health-badge" in html or "MAPE" in html

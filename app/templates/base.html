@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Perekup Dashboard{% endblock %}</title>
+    <script>
+    /* Apply saved theme before render to prevent flash of wrong theme */
+    (function() {
+        var saved = 'light';
+        try { saved = localStorage.getItem('perekup_theme') || 'light'; } catch(e) {}
+        if (saved === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    })();
+    </script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -20,6 +30,9 @@
                 <a href="/">Объявления</a>
                 <a href="/stats">Статистика</a>
             </nav>
+            <button class="theme-toggle" id="theme-toggle" aria-label="Переключить тему" title="Переключить тему">
+                <span class="theme-icon" id="theme-icon">&#9790;</span>
+            </button>
             <span class="subtitle">Авто ниже рынка &mdash; Avito / Drom / Auto.ru</span>
         </div>
     </header>
@@ -31,6 +44,43 @@
             var open = nav.classList.toggle('nav-open');
             btn.classList.toggle('burger-open', open);
             btn.setAttribute('aria-expanded', open);
+        });
+
+        /* Theme toggle */
+        var THEME_KEY = 'perekup_theme';
+        var toggle = document.getElementById('theme-toggle');
+        var icon = document.getElementById('theme-icon');
+
+        function getTheme() {
+            try { return localStorage.getItem(THEME_KEY) || 'light'; } catch(e) { return 'light'; }
+        }
+
+        function setThemeIcon(theme) {
+            /* Moon for light mode (click to go dark), Sun for dark mode (click to go light) */
+            icon.innerHTML = theme === 'dark' ? '&#9788;' : '&#9790;';
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+            setThemeIcon(theme);
+            try { localStorage.setItem(THEME_KEY, theme); } catch(e) {}
+        }
+
+        /* Set initial icon based on current theme */
+        setThemeIcon(getTheme());
+
+        toggle.addEventListener('click', function() {
+            var current = getTheme();
+            var next = current === 'dark' ? 'light' : 'dark';
+            document.body.classList.add('theme-transitioning');
+            applyTheme(next);
+            setTimeout(function() {
+                document.body.classList.remove('theme-transitioning');
+            }, 350);
         });
     })();
     </script>

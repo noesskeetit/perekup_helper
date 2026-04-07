@@ -255,6 +255,8 @@ async def test_deal_score_sort_works(async_client):
 @pytest.mark.asyncio
 async def test_model_health_widget_structure(async_client):
     """Stats bar contains model health widget with MAPE and training info."""
+    import app.services.pricing  # noqa: F401 — ensure submodule is loaded before patching
+
     fake_model = MagicMock()
     fake_model.is_trained = True
     fake_model.get_info.return_value = {

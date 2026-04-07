@@ -23,10 +23,26 @@
     </div>
     {% endif %}
     {% if stats.model_info %}
+    <div class="stat-item stat-model model-health">
+        {% set mape = stats.model_info.p50_mape %}
+        {% if mape is not none %}
+        <span class="stat-value">
+            <span class="health-badge {% if mape < 15 %}health-green{% elif mape < 25 %}health-yellow{% else %}health-red{% endif %}"></span>
+            {{ "%.1f" | format(mape) }}%
+        </span>
+        <span class="stat-label">MAPE</span>
+        {% endif %}
+    </div>
     <div class="stat-item stat-model">
         <span class="stat-value">{{ stats.model_info.training_size }}</span>
-        <span class="stat-label">Модель обучена на</span>
+        <span class="stat-label">Обучающих выборок</span>
     </div>
+    {% if stats.model_info.trained_at %}
+    <div class="stat-item stat-model">
+        <span class="stat-value">{{ stats.model_info.trained_at[:10] }}</span>
+        <span class="stat-label">Дата обучения</span>
+    </div>
+    {% endif %}
     {% endif %}
 </div>
 {% endif %}
@@ -80,6 +96,13 @@
                                min="0" max="50" step="1"
                                value="{{ filters.market_diff_pct_min if filters.market_diff_pct_min != "" else 0 }}"
                                oninput="document.getElementById('mdp-val').textContent=this.value">
+                    </div>
+                    <div class="filter-group">
+                        <label for="deal_score_min">Мин. Deal Score <span id="ds-val">{{ filters.deal_score_min if filters.deal_score_min != "" else 0 }}</span></label>
+                        <input type="range" id="deal_score_min" name="deal_score_min"
+                               min="0" max="100" step="1"
+                               value="{{ filters.deal_score_min if filters.deal_score_min != "" else 0 }}"
+                               oninput="document.getElementById('ds-val').textContent=this.value">
                     </div>
                     <div class="filter-group">
                         <label for="category">Категория</label>
@@ -179,7 +202,7 @@
 </div>
 
 <script>
-var FILTER_FIELDS = ['brand', 'car_model', 'year_from', 'year_to', 'price_from', 'price_to', 'diff_from', 'diff_to', 'market_diff_pct_min', 'category', 'city', 'source', 'hide_duplicates'];
+var FILTER_FIELDS = ['brand', 'car_model', 'year_from', 'year_to', 'price_from', 'price_to', 'diff_from', 'diff_to', 'market_diff_pct_min', 'deal_score_min', 'category', 'city', 'source', 'hide_duplicates'];
 var STORAGE_KEY = 'perekup_filters';
 
 function saveFilters() {
@@ -206,6 +229,10 @@ function restoreFilters() {
                     if (name === 'market_diff_pct_min') {
                         var label = document.getElementById('mdp-val');
                         if (label) label.textContent = data[name];
+                    }
+                    if (name === 'deal_score_min') {
+                        var dsLabel = document.getElementById('ds-val');
+                        if (dsLabel) dsLabel.textContent = data[name];
                     }
                 }
             }

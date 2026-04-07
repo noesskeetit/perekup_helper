@@ -50,6 +50,7 @@ SORT_COLUMNS = {
     "price_diff_pct": Listing.price_diff_pct,
     "category": ListingAnalysis.category,
     "confidence": ListingAnalysis.confidence,
+    "deal_score": ListingAnalysis.score,
     "created_at": Listing.created_at,
     "age": Listing.created_at,
 }
@@ -106,6 +107,7 @@ async def listings_page(
     category: str | None = Query(None),
     source: str | None = Query(None),
     city: str | None = Query(None),
+    deal_score_min: str | None = Query(None),
     hide_duplicates: str = Query("true"),
     sort_by: str = Query("price_diff_pct"),
     sort_dir: str = Query("desc"),
@@ -135,6 +137,7 @@ async def listings_page(
     diff_from_v = _float(diff_from)
     diff_to_v = _float(diff_to)
     market_diff_pct_min_v = _float(market_diff_pct_min)
+    deal_score_min_v = _float(deal_score_min)
     page_v = max(1, _int(page) or 1)
     hide_duplicates_v = hide_duplicates.lower() not in ("false", "0", "no")
 
@@ -168,7 +171,15 @@ async def listings_page(
     if hide_duplicates_v:
         stmt = stmt.where(Listing.is_duplicate.is_(False))
 
-    needs_join = sort_by in ("category", "confidence") and not category
+    # Deal score filter — requires joining ListingAnalysis
+    needs_score_join = False
+    if deal_score_min_v is not None and deal_score_min_v > 0:
+        if not category:
+            stmt = stmt.join(ListingAnalysis, isouter=True)
+            needs_score_join = True
+        stmt = stmt.where(ListingAnalysis.score >= deal_score_min_v)
+
+    needs_join = sort_by in ("category", "confidence", "deal_score") and not category and not needs_score_join
     if needs_join:
         stmt = stmt.join(ListingAnalysis, isouter=True)
 
@@ -217,6 +228,7 @@ async def listings_page(
             "diff_from": diff_from or "",
             "diff_to": diff_to or "",
             "market_diff_pct_min": market_diff_pct_min or "",
+            "deal_score_min": deal_score_min or "",
             "category": category or "",
             "source": source or "",
             "city": city or "",

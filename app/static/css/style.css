@@ -511,6 +511,20 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 .stat-hot { color: var(--bad); font-weight: 700; }
 .stat-model .stat-label { color: var(--primary); }
 
+/* Model health badge */
+.health-badge {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+.health-green { background: #22c55e; box-shadow: 0 0 4px #22c55e88; }
+.health-yellow { background: #eab308; box-shadow: 0 0 4px #eab30888; }
+.health-red { background: #ef4444; box-shadow: 0 0 4px #ef444488; }
+.model-health .stat-value { display: flex; align-items: center; justify-content: center; }
+
 /* Score badge */
 .score-badge {
     display: inline-block;

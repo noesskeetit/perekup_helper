@@ -57,19 +57,33 @@ async def health():
 @app.post("/api/run-pipeline")
 async def run_pipeline_now():
     """Manually trigger the full pipeline (parse + score + analyze)."""
+    import logging
+    import traceback
+
     from app.parsers.pipeline import run_pipeline
 
-    result = await run_pipeline()
-    return {
-        "total_new": result.total_new,
-        "total_scored": result.total_scored,
-        "total_analyzed": result.total_analyzed,
-        "errors": result.errors,
-        "sources": [
-            {"source": r.source, "fetched": r.total_fetched, "new": r.new_saved, "dupes": r.duplicates_skipped}
-            for r in result.source_results
-        ],
-    }
+    logger = logging.getLogger(__name__)
+    try:
+        result = await run_pipeline()
+        return {
+            "total_new": result.total_new,
+            "total_scored": result.total_scored,
+            "total_analyzed": result.total_analyzed,
+            "errors": result.errors,
+            "sources": [
+                {"source": r.source, "fetched": r.total_fetched, "new": r.new_saved, "dupes": r.duplicates_skipped}
+                for r in result.source_results
+            ],
+        }
+    except Exception:
+        logger.exception("Pipeline crashed with unhandled exception")
+        return {
+            "error": traceback.format_exc(),
+            "total_new": 0,
+            "total_scored": 0,
+            "total_analyzed": 0,
+            "errors": ["pipeline_crash"],
+        }
 
 
 @app.post("/api/retrain-model")

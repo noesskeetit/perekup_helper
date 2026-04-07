@@ -87,10 +87,16 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
             result.errors.append(f"{source}: {exc}")
             return ParseResult(source=source, errors=1, elapsed_seconds=time.time() - start)
 
-    parse_results = await asyncio.gather(*[_fetch_and_ingest(p) for p in parsers])
-    for pr in parse_results:
-        result.source_results.append(pr)
-        result.total_new += pr.new_saved
+    parse_results = await asyncio.gather(*[_fetch_and_ingest(p) for p in parsers], return_exceptions=True)
+    for i, pr in enumerate(parse_results):
+        if isinstance(pr, BaseException):
+            source = parsers[i].source_name
+            logger.exception("Pipeline: %s raised unhandled exception", source, exc_info=pr)
+            result.errors.append(f"{source}: {pr}")
+            result.source_results.append(ParseResult(source=source, errors=1))
+        else:
+            result.source_results.append(pr)
+            result.total_new += pr.new_saved
 
     # Step 2.5: Deduplicate across sources
     if result.total_new > 0:

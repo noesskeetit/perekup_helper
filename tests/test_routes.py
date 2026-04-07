@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -253,7 +255,17 @@ async def test_deal_score_sort_works(async_client):
 @pytest.mark.asyncio
 async def test_model_health_widget_structure(async_client):
     """Stats bar contains model health widget with MAPE and training info."""
-    resp = await async_client.get("/")
+    fake_model = MagicMock()
+    fake_model.is_trained = True
+    fake_model.get_info.return_value = {
+        "is_trained": True,
+        "trained_at": "2026-04-01T12:00:00",
+        "training_size": 5000,
+        "quantiles": ["P10", "P50", "P90"],
+        "p50_mape": 12.5,
+    }
+    with patch("app.services.pricing.get_price_model", return_value=fake_model):
+        resp = await async_client.get("/")
     assert resp.status_code == 200
     html = resp.text
     # The widget should have model-health class and health badge

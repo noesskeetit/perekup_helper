@@ -425,6 +425,280 @@ header .subtitle { color: var(--text-muted); margin-left: 12px; font-size: 0.9re
 }
 .detail-header h2 { font-size: 1.4rem; }
 
+/* --- Photo Gallery --- */
+.gallery { margin-bottom: 20px; }
+.gallery-main {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    background: var(--bg);
+}
+.gallery-main img {
+    width: 100%;
+    height: 400px;
+    object-fit: cover;
+    display: block;
+}
+.gallery-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.gallery-main:hover .gallery-nav { opacity: 1; }
+.gallery-prev { left: 10px; }
+.gallery-next { right: 10px; }
+.gallery-nav:hover { background: rgba(0, 0, 0, 0.7); }
+.gallery-counter {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.gallery-thumbs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+}
+.gallery-thumb {
+    width: 72px;
+    height: 54px;
+    object-fit: cover;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    opacity: 0.6;
+    transition: opacity 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+}
+.gallery-thumb:hover { opacity: 0.85; }
+.gallery-thumb-active {
+    opacity: 1;
+    border-color: var(--primary);
+}
+.gallery-placeholder {
+    width: 100%;
+    height: 200px;
+    background: var(--surface-alt);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+}
+
+/* --- Verdict Banner --- */
+.verdict-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border: 1px solid;
+}
+.verdict-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.verdict-content {
+    flex: 1;
+    min-width: 0;
+}
+.verdict-label {
+    display: block;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+.verdict-summary {
+    display: block;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+.verdict-confidence {
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .verdict-confidence { background: rgba(255, 255, 255, 0.08); }
+
+.verdict-clean { background: var(--good-bg); border-color: var(--good-border); }
+.verdict-clean .verdict-label { color: var(--good); }
+.verdict-clean .verdict-icon { color: var(--good); }
+
+.verdict-damaged_body { background: var(--bad-bg); border-color: var(--bad-border); }
+.verdict-damaged_body .verdict-label { color: var(--bad); }
+.verdict-damaged_body .verdict-icon { color: var(--bad); }
+
+.verdict-bad_docs { background: var(--bad-bg); border-color: var(--bad-border); }
+.verdict-bad_docs .verdict-label { color: var(--bad); }
+.verdict-bad_docs .verdict-icon { color: var(--bad); }
+
+.verdict-debtor { background: var(--bad-bg); border-color: var(--bad-border); }
+.verdict-debtor .verdict-label { color: var(--bad); }
+.verdict-debtor .verdict-icon { color: var(--bad); }
+
+.verdict-complex_but_profitable { background: var(--warning-bg); border-color: var(--warning-border); }
+.verdict-complex_but_profitable .verdict-label { color: var(--warning); }
+.verdict-complex_but_profitable .verdict-icon { color: var(--warning); }
+
+/* --- Price Comparison Block --- */
+.price-block {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+.price-block-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+}
+.price-block-header h3 {
+    font-size: 1rem;
+    margin: 0;
+    color: var(--text);
+}
+.price-block-body { padding: 18px; }
+.price-main-row {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.price-item { flex: 1; min-width: 140px; }
+.price-item-label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+.price-item-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.price-listing .price-item-value { color: var(--primary); }
+
+.price-diff-row { margin-bottom: 16px; }
+.price-diff-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+.price-diff-indicator.diff-hot { background: var(--score-hot-bg); color: var(--score-hot-color); }
+.price-diff-indicator.diff-good { background: var(--score-good-bg); color: var(--score-good-color); }
+.price-diff-indicator.diff-ok { background: var(--score-good-bg); color: var(--score-good-color); }
+.price-diff-indicator.diff-neutral { background: var(--surface); color: var(--text-muted); }
+.price-diff-indicator.diff-bad { background: var(--bad-bg); color: var(--bad); }
+.price-diff-pct { font-size: 1.2rem; }
+.price-diff-abs { font-size: 0.9rem; opacity: 0.8; }
+.price-diff-label { font-size: 0.85rem; font-weight: 500; }
+
+.price-bar-container { margin-top: 4px; }
+.price-bar {
+    position: relative;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.price-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+.bar-good { background: var(--good); }
+.bar-ok { background: var(--good); opacity: 0.7; }
+.bar-neutral { background: var(--warning); }
+.bar-bad { background: var(--bad); }
+.price-bar-center {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    width: 2px;
+    height: 12px;
+    background: var(--text-muted);
+    transform: translateX(-50%);
+}
+.price-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.price-extra-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+}
+.price-extra-label { font-size: 0.85rem; color: var(--text-muted); }
+.price-extra-value { font-size: 1rem; font-weight: 600; color: var(--text); }
+
+.price-history { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.price-history h4 {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.price-history-list { display: flex; flex-direction: column; gap: 4px; }
+.price-history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+    padding: 4px 0;
+}
+.price-history-date { color: var(--text-muted); min-width: 80px; }
+.price-history-value { font-weight: 600; }
+.price-history-change { font-size: 0.8rem; font-weight: 500; }
+.change-down { color: var(--good); }
+.change-up { color: var(--bad); }
+
+/* Legacy .detail-photos preserved for backward compat */
 .detail-photos {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -940,6 +1214,21 @@ body.theme-transitioning *::after {
     .detail-header h2 { font-size: 1.2rem; width: 100%; }
     .detail-photos { grid-template-columns: 1fr 1fr; }
     .info-grid { grid-template-columns: 1fr 1fr; }
+
+    /* Gallery mobile */
+    .gallery-main img { height: 260px; }
+    .gallery-nav { opacity: 1; width: 36px; height: 36px; font-size: 1.3rem; }
+    .gallery-thumb { width: 56px; height: 42px; }
+
+    /* Verdict mobile */
+    .verdict-banner { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+    .verdict-icon { font-size: 1.3rem; }
+    .verdict-label { font-size: 0.92rem; }
+
+    /* Price block mobile */
+    .price-main-row { gap: 12px; }
+    .price-item-value { font-size: 1.15rem; }
+    .price-diff-pct { font-size: 1rem; }
 
     /* -- Stats bar mobile -- */
     .stats-bar { gap: 8px; }

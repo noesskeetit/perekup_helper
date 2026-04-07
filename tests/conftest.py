@@ -206,8 +206,19 @@ def _make_async_listings():
             price_diff_pct=11.8,
             description="Один владелец",
             url="https://example.com/1",
-            photos=["https://example.com/photo1.jpg", "https://example.com/photo2.jpg"],
-            raw_data=None,
+            photos=[
+                "https://example.com/photo1.jpg",
+                "https://example.com/photo2.jpg",
+                "https://example.com/photo3.jpg",
+            ],
+            raw_data={
+                "avito_estimate": 1_650_000,
+                "price_history": [
+                    {"date": "2026-04-01", "price": 1_500_000},
+                    {"date": "2026-03-15", "price": 1_550_000},
+                    {"date": "2026-03-01", "price": 1_600_000},
+                ],
+            },
         ),
         Listing(
             id=_ASYNC_LISTING_IDS[1],

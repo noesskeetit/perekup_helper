@@ -143,11 +143,13 @@ class AvitoParser(BaseParser):
         """Fetch detail pages and extract full specs.
 
         Skips detail fetch for listings whose external_id already exists in the
-        database, saving ~1s per known listing. Uses concurrent fetching with
-        a thread pool for parallel detail page downloads.
+        database, saving ~1s per known listing.
+
+        Note: curl_cffi sessions are NOT thread-safe, so detail fetching runs
+        sequentially to avoid segfaults from concurrent access to the
+        underlying libcurl handle.
         """
         import time
-        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         from app.parsers.avito_detail import enrich_listing_from_detail
 
@@ -162,70 +164,53 @@ class AvitoParser(BaseParser):
         )
         enriched = 0
 
-        def _fetch_one_detail(listing: ParsedListing) -> bool:
+        for listing in need_enrichment:
             if not listing.url:
-                return False
+                continue
             try:
                 html = avito_parser.fetch_data(url=listing.url)
                 if html:
                     enrich_listing_from_detail(listing, html)
-                    return True
+                    enriched += 1
             except Exception:
                 logger.debug("Failed to enrich %s", listing.external_id, exc_info=True)
             time.sleep(self._detail_pause)
-            return False
-
-        # Concurrent detail fetching with limited parallelism
-        with ThreadPoolExecutor(max_workers=self._detail_concurrency) as executor:
-            futures = {executor.submit(_fetch_one_detail, item): item for item in need_enrichment}
-            for future in as_completed(futures):
-                if future.result():
-                    enriched += 1
 
         logger.info("Enriched %d/%d listings with detail data", enriched, len(need_enrichment))
         return listings
 
     @staticmethod
     def _get_known_external_ids(external_ids: list[str]) -> set[str]:
-        """Query the database for which external_ids already exist (sync-safe via asyncio)."""
+        """Query the database for which external_ids already exist (sync-safe).
+
+        Uses a synchronous SQLAlchemy engine to avoid asyncio.run() inside
+        asyncio.to_thread(), which causes crashes on Python 3.13.
+        """
         if not external_ids:
             return set()
         try:
-            from sqlalchemy import text
-            from sqlalchemy.ext.asyncio import create_async_engine
+            from sqlalchemy import create_engine, text
 
             from app.config import settings
 
-            async def _query():
-                engine = create_async_engine(settings.database_url, pool_size=1)
-                try:
-                    async with engine.connect() as conn:
-                        placeholders = ", ".join(f":id{i}" for i in range(len(external_ids)))
-                        params = {f"id{i}": eid for i, eid in enumerate(external_ids)}
-                        result = await conn.execute(
-                            text(
-                                f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"
-                            ),
-                            params,
-                        )
-                        return {row[0] for row in result}
-                finally:
-                    await engine.dispose()
+            # Convert async DB URL to sync: postgresql+asyncpg:// → postgresql://
+            db_url = settings.database_url
+            db_url = db_url.replace("+asyncpg", "").replace("+aiosqlite", "")
 
-            # Run async query from sync context (we're in a thread)
-            import asyncio
-
+            engine = create_engine(db_url, pool_size=1, pool_pre_ping=True)
             try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-
-            if loop and loop.is_running():
-                # We're inside an existing event loop (called from to_thread)
-                # Create a new loop in this thread
-                return asyncio.run(_query())
-            else:
-                return asyncio.run(_query())
+                with engine.connect() as conn:
+                    placeholders = ", ".join(f":id{i}" for i in range(len(external_ids)))
+                    params = {f"id{i}": eid for i, eid in enumerate(external_ids)}
+                    result = conn.execute(
+                        text(
+                            f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"
+                        ),
+                        params,
+                    )
+                    return {row[0] for row in result}
+            finally:
+                engine.dispose()
         except Exception:
             logger.debug("Avito: could not check existing IDs, will enrich all", exc_info=True)
             return set()

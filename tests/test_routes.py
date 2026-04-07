@@ -149,7 +149,7 @@ async def test_photo_gallery_in_detail(async_detail_client):
     resp = await async_detail_client.get(f"/listings/{listing_id}", headers={"HX-Request": "true"})
     assert resp.status_code == 200
     html = resp.text
-    assert "detail-photos" in html
+    assert "gallery-main" in html
     assert "<img" in html
     assert "example.com/photo1.jpg" in html
 

@@ -18,43 +18,151 @@
         {% endif %}
     </div>
 
-    {% if listing.photos and listing.photos | length > 0 %}
-    <div class="detail-photos">
-        {% for photo in listing.photos[:6] %}
-        <img src="{{ photo }}" alt="Фото {{ loop.index }}" loading="lazy">
-        {% endfor %}
+    {# ── AI Verdict Banner ── #}
+    {% if listing.analysis %}
+    <div class="verdict-banner verdict-{{ listing.analysis.category }}">
+        <div class="verdict-icon">
+            {% if listing.analysis.category == "clean" %}&#10003;
+            {% elif listing.analysis.category == "damaged_body" %}&#9888;
+            {% elif listing.analysis.category == "bad_docs" %}&#128196;
+            {% elif listing.analysis.category == "debtor" %}&#128181;
+            {% elif listing.analysis.category == "complex_but_profitable" %}&#9878;
+            {% else %}&#8226;{% endif %}
+        </div>
+        <div class="verdict-content">
+            <span class="verdict-label">{{ categories.get(listing.analysis.category, listing.analysis.category) }}</span>
+            {% if listing.analysis.ai_summary %}
+            <span class="verdict-summary">{{ listing.analysis.ai_summary }}</span>
+            {% endif %}
+        </div>
+        {% if listing.analysis.confidence %}
+        <div class="verdict-confidence" title="Уверенность модели">
+            {{ "%.0f" | format(listing.analysis.confidence * 100) }}%
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
+    {# ── Photo Gallery ── #}
+    {% if listing.photos and listing.photos | length > 0 %}
+    <div class="gallery" id="gallery">
+        <div class="gallery-main">
+            <img src="{{ listing.photos[0] }}" alt="{{ listing.brand }} {{ listing.model }}" id="gallery-main-img" loading="lazy">
+            {% if listing.photos | length > 1 %}
+            <button class="gallery-nav gallery-prev" onclick="galleryNav(-1)" aria-label="Предыдущее фото">&#8249;</button>
+            <button class="gallery-nav gallery-next" onclick="galleryNav(1)" aria-label="Следующее фото">&#8250;</button>
+            <span class="gallery-counter" id="gallery-counter">1 / {{ listing.photos | length }}</span>
+            {% endif %}
+        </div>
+        {% if listing.photos | length > 1 %}
+        <div class="gallery-thumbs">
+            {% for photo in listing.photos %}
+            <img src="{{ photo }}"
+                 alt="Фото {{ loop.index }}"
+                 class="gallery-thumb {% if loop.first %}gallery-thumb-active{% endif %}"
+                 data-index="{{ loop.index0 }}"
+                 onclick="gallerySelect({{ loop.index0 }})"
+                 loading="lazy">
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="gallery-placeholder">
+        <span>Нет фото</span>
+    </div>
+    {% endif %}
+
+    {# ── Price Comparison Block ── #}
+    <div class="price-block">
+        <div class="price-block-header">
+            <h3>Цена и рынок</h3>
+        </div>
+        <div class="price-block-body">
+            <div class="price-main-row">
+                <div class="price-item price-listing">
+                    <span class="price-item-label">Цена объявления</span>
+                    <span class="price-item-value">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</span>
+                </div>
+                {% if listing.market_price %}
+                <div class="price-item price-market">
+                    <span class="price-item-label">Рыночная (P50)</span>
+                    <span class="price-item-value">{{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;</span>
+                </div>
+                {% endif %}
+            </div>
+            {% if listing.price_diff_pct is not none and listing.market_price %}
+            <div class="price-diff-row">
+                {% set diff_pct = listing.price_diff_pct|float %}
+                {% set diff_rub = listing.price - listing.market_price %}
+                <div class="price-diff-indicator {% if diff_pct > 15 %}diff-hot{% elif diff_pct > 5 %}diff-good{% elif diff_pct > 0 %}diff-ok{% elif diff_pct > -10 %}diff-neutral{% else %}diff-bad{% endif %}">
+                    <span class="price-diff-pct">
+                        {% if diff_pct > 0 %}&minus;{% elif diff_pct < 0 %}+{% endif %}{{ "%.1f" | format(diff_pct|abs) }}%
+                    </span>
+                    <span class="price-diff-abs">
+                        ({{ "{:,.0f}".format(diff_rub).replace(",", " ") }} &#8381;)
+                    </span>
+                    <span class="price-diff-label">
+                        {% if diff_pct > 15 %}Значительно ниже рынка
+                        {% elif diff_pct > 5 %}Ниже рынка
+                        {% elif diff_pct > 0 %}Немного ниже рынка
+                        {% elif diff_pct > -10 %}Около рыночной
+                        {% else %}Выше рынка{% endif %}
+                    </span>
+                </div>
+                <div class="price-bar-container">
+                    {% set bar_pct = [[-30, diff_pct]|max, 30]|min %}
+                    {% set bar_width = ((bar_pct + 30) / 60 * 100)|int %}
+                    <div class="price-bar">
+                        <div class="price-bar-fill {% if diff_pct > 5 %}bar-good{% elif diff_pct > 0 %}bar-ok{% elif diff_pct > -10 %}bar-neutral{% else %}bar-bad{% endif %}" style="width: {{ bar_width }}%"></div>
+                        <div class="price-bar-center"></div>
+                    </div>
+                    <div class="price-bar-labels">
+                        <span>Выше рынка</span>
+                        <span>Рыночная</span>
+                        <span>Ниже рынка</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Avito estimate from raw_data #}
+            {% if listing.raw_data and listing.raw_data.avito_estimate %}
+            <div class="price-extra-row">
+                <span class="price-extra-label">Оценка Avito</span>
+                <span class="price-extra-value">{{ "{:,.0f}".format(listing.raw_data.avito_estimate).replace(",", " ") }} &#8381;</span>
+            </div>
+            {% endif %}
+
+            {# Price history from raw_data #}
+            {% if listing.raw_data and listing.raw_data.price_history %}
+            <div class="price-history">
+                <h4>История цены</h4>
+                <div class="price-history-list">
+                    {% for entry in listing.raw_data.price_history %}
+                    <div class="price-history-item">
+                        <span class="price-history-date">{{ entry.date }}</span>
+                        <span class="price-history-value">{{ "{:,.0f}".format(entry.price).replace(",", " ") }} &#8381;</span>
+                        {% if not loop.last %}
+                        {% set next_price = listing.raw_data.price_history[loop.index].price %}
+                        {% set change = entry.price - next_price %}
+                        {% if change != 0 %}
+                        <span class="price-history-change {% if change < 0 %}change-down{% else %}change-up{% endif %}">
+                            {% if change < 0 %}&darr;{% else %}&uarr;{% endif %} {{ "{:,.0f}".format(change|abs).replace(",", " ") }}
+                        </span>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Vehicle Details Grid ── #}
     <div class="detail-info">
         <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Цена</span>
-                <span class="info-value price">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</span>
-            </div>
-            {% if listing.market_price %}
-            <div class="info-item">
-                <span class="info-label">Рыночная (P50)</span>
-                <span class="info-value">{{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;</span>
-            </div>
-            {% endif %}
-            {% if listing.price_diff_pct is not none %}
-            <div class="info-item">
-                <span class="info-label">vs Рынок</span>
-                <span class="info-value diff-badge {% if listing.price_diff_pct|float > 15 %}diff-hot{% elif listing.price_diff_pct|float > 5 %}diff-good{% elif listing.price_diff_pct|float > 0 %}diff-ok{% elif listing.price_diff_pct|float > -10 %}diff-neutral{% else %}diff-bad{% endif %}">
-                    {% if listing.price_diff_pct|float > 0 %}&minus;{% elif listing.price_diff_pct|float < 0 %}+{% endif %}{{ "%.1f" | format(listing.price_diff_pct|float|abs) }}%
-                </span>
-            </div>
-            {% endif %}
-            {% if listing.market_price and listing.price %}
-            {% set diff_rub = listing.price - listing.market_price %}
-            <div class="info-item">
-                <span class="info-label">Разница</span>
-                <span class="info-value price-diff-abs {% if diff_rub < 0 %}diff-good{% elif diff_rub > 0 %}diff-bad{% else %}diff-neutral{% endif %}">
-                    {{ "{:,.0f}".format(diff_rub).replace(",", " ") }} &#8381;
-                </span>
-            </div>
-            {% endif %}
             {% if listing.mileage %}
             <div class="info-item">
                 <span class="info-label">Пробег</span>
@@ -112,6 +220,7 @@
         </div>
     </div>
 
+    {# ── AI Analysis Details ── #}
     {% if listing.analysis %}
     <div class="ai-analysis">
         <h3>AI-Анализ</h3>
@@ -164,3 +273,49 @@
         <a href="{{ listing.url }}" target="_blank" rel="noopener" class="btn btn-primary">Открыть оригинал &rarr;</a>
     </div>
 </div>
+
+<script>
+(function() {
+    var galleryEl = document.getElementById('gallery');
+    if (!galleryEl) return;
+    var mainImg = document.getElementById('gallery-main-img');
+    var counter = document.getElementById('gallery-counter');
+    var thumbs = galleryEl.querySelectorAll('.gallery-thumb');
+    if (!mainImg || thumbs.length < 2) return;
+
+    var photos = [];
+    for (var i = 0; i < thumbs.length; i++) {
+        photos.push(thumbs[i].src);
+    }
+    var currentIndex = 0;
+
+    function updateGallery(idx) {
+        currentIndex = idx;
+        mainImg.src = photos[idx];
+        if (counter) counter.textContent = (idx + 1) + ' / ' + photos.length;
+        for (var i = 0; i < thumbs.length; i++) {
+            if (i === idx) {
+                thumbs[i].classList.add('gallery-thumb-active');
+            } else {
+                thumbs[i].classList.remove('gallery-thumb-active');
+            }
+        }
+        /* Scroll active thumbnail into view */
+        thumbs[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+
+    window.gallerySelect = function(idx) {
+        if (idx >= 0 && idx < photos.length) updateGallery(idx);
+    };
+    window.galleryNav = function(dir) {
+        var next = (currentIndex + dir + photos.length) % photos.length;
+        updateGallery(next);
+    };
+
+    /* Keyboard navigation */
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowLeft') window.galleryNav(-1);
+        if (e.key === 'ArrowRight') window.galleryNav(1);
+    });
+})();
+</script>

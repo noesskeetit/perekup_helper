@@ -41,8 +41,14 @@ async def _retrain_price_model_job() -> None:
         logger.info("Scheduler: model training result — %s", stats)
 
         if stats.get("status") == "trained":
-            scored = await score_listings(limit=2000)
+            scored = await score_listings(limit=5000)
             logger.info("Scheduler: re-scored %d listings after retraining", scored)
+
+        # Also update deal scores
+        from app.services.deal_scorer import score_deals
+
+        deal_scored = await score_deals(limit=5000)
+        logger.info("Scheduler: updated %d deal scores", deal_scored)
     except Exception:
         logger.exception("Scheduler: price model retraining failed")
 

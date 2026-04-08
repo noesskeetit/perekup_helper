@@ -37,7 +37,8 @@ async def _retrain_price_model_job() -> None:
 
     logger.info("Scheduler: retraining price model")
     try:
-        stats = await train_model()
+        # Exclude Auto.ru from training due to price data quality issues
+        stats = await train_model(exclude_sources=["autoru"])
         logger.info("Scheduler: model training result — %s", stats)
 
         if stats.get("status") == "trained":

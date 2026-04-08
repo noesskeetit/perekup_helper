@@ -114,7 +114,8 @@ async def retrain_model_now():
     """Manually retrain the CatBoost price model."""
     from app.services.pricing_trainer import score_listings, train_model
 
-    stats = await train_model()
+    # Exclude Auto.ru from training due to price data quality issues
+    stats = await train_model(exclude_sources=["autoru"])
     scored = 0
     if stats.get("status") == "trained":
         scored = await score_listings(limit=5000)

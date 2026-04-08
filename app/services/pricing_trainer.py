@@ -36,8 +36,11 @@ from app.services.pricing import CURRENT_YEAR, MODEL_DIR, get_price_model
 logger = logging.getLogger(__name__)
 
 
-async def train_model() -> dict:
+async def train_model(*, exclude_sources: list[str] | None = None) -> dict:
     """Fetch all listings from DB and retrain the price model.
+
+    Args:
+        exclude_sources: Source names to exclude from training (e.g., ["autoru"]).
 
     Returns training stats dict.
     """
@@ -46,6 +49,9 @@ async def train_model() -> dict:
             Listing.price > 0,
             Listing.is_duplicate.is_(False),
         )
+        if exclude_sources:
+            for src in exclude_sources:
+                stmt = stmt.where(Listing.source != src)
         result = await session.execute(stmt)
         listings = list(result.scalars().all())
 

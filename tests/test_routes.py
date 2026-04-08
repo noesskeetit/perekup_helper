@@ -255,8 +255,6 @@ async def test_deal_score_sort_works(async_client):
 @pytest.mark.asyncio
 async def test_model_health_widget_structure(async_client):
     """Stats bar contains model health widget with MAPE and training info."""
-    import app.services.pricing  # noqa: F401 — ensure submodule is loaded before patching
-
     fake_model = MagicMock()
     fake_model.is_trained = True
     fake_model.get_info.return_value = {
@@ -266,7 +264,10 @@ async def test_model_health_widget_structure(async_client):
         "quantiles": ["P10", "P50", "P90"],
         "p50_mape": 12.5,
     }
-    with patch("app.services.pricing.get_price_model", return_value=fake_model):
+    # Mock the entire pricing module to avoid importing numpy/catboost in CI
+    mock_pricing = MagicMock()
+    mock_pricing.get_price_model = MagicMock(return_value=fake_model)
+    with patch.dict("sys.modules", {"app.services.pricing": mock_pricing}):
         resp = await async_client.get("/")
     assert resp.status_code == 200
     html = resp.text

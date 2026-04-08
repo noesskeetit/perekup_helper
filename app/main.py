@@ -314,92 +314,52 @@ async def price_drops(
 
 
 @app.get("/api/top-deals")
-async def top_deals(limit: int = 20, min_score: int = 0):
-    """Top deals ranked by multi-factor deal score (0-100).
+async def top_deals(limit: int = 20, min_score: int = 70):
+    """Top deals ranked by deal_score (0-100).
 
-    Unlike /api/hot-deals which only checks price_diff_pct,
-    this uses the composite score from deal_scorer that considers
-    price vs market, AI category, mileage, photos, etc.
+    Uses the pre-computed deal_score which factors in:
+    price vs market, AI category, mileage, photos, freshness, owners, data completeness.
     """
     from sqlalchemy import desc, select
     from sqlalchemy.orm import selectinload
 
     from app.db.session import async_session_factory
-    from app.models.listing import Listing, ListingAnalysis
-    from app.services.deal_scorer import compute_deal_score
+    from app.models.listing import Listing
 
     async with async_session_factory() as session:
-        # Primary path: listings with analysis.score already computed
         stmt = (
             select(Listing)
             .options(selectinload(Listing.analysis))
-            .join(ListingAnalysis)
             .where(
                 Listing.is_duplicate.is_(False),
-                ListingAnalysis.score.isnot(None),
-                ListingAnalysis.score >= min_score,
-                ListingAnalysis.category.in_(["clean", "complex_but_profitable"]),
+                Listing.deal_score.isnot(None),
+                Listing.deal_score >= min_score,
+                Listing.price > 100_000,  # filter garbage prices
             )
-            .order_by(desc(ListingAnalysis.score))
+            .order_by(desc(Listing.deal_score), desc(Listing.price_diff_pct))
             .limit(limit)
         )
         result = await session.execute(stmt)
-        scored_listings = list(result.scalars().all())
+        listings = list(result.scalars().all())
 
-        # Fallback: if not enough pre-scored listings, compute on the fly
-        # from recent listings with market price data
-        if len(scored_listings) < limit:
-            remaining = limit - len(scored_listings)
-            scored_ids = {item.id for item in scored_listings}
-            fallback_stmt = (
-                select(Listing)
-                .options(selectinload(Listing.analysis))
-                .where(
-                    Listing.is_duplicate.is_(False),
-                    Listing.market_price.isnot(None),
-                    Listing.price_diff_pct.isnot(None),
-                )
-                .order_by(desc(Listing.price_diff_pct))
-                .limit(remaining * 2)  # fetch extra to filter and sort
-            )
-            fb_result = await session.execute(fallback_stmt)
-            candidates = [row for row in fb_result.scalars().all() if row.id not in scored_ids]
-
-            # Score them on the fly
-            computed = []
-            for listing in candidates:
-                s = await compute_deal_score(listing)
-                if s >= min_score:
-                    computed.append((listing, s))
-            computed.sort(key=lambda x: x[1], reverse=True)
-            scored_listings.extend([pair[0] for pair in computed[:remaining]])
-
-    deals = []
-    for listing in scored_listings:
-        deal_score = listing.analysis.score if listing.analysis and listing.analysis.score is not None else None
-        if deal_score is None:
-            deal_score = await compute_deal_score(listing)
-        deals.append(
-            {
-                "brand": listing.brand,
-                "model": listing.model,
-                "year": listing.year,
-                "price": listing.price,
-                "market_price": listing.market_price,
-                "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
-                "deal_score": int(deal_score),
-                "city": listing.city,
-                "mileage": listing.mileage,
-                "url": listing.url,
-                "source": listing.source,
-                "category": listing.analysis.category if listing.analysis else None,
-                "ai_summary": listing.analysis.ai_summary if listing.analysis else None,
-            }
-        )
-
-    # Final sort by deal_score descending (in case fallback items were mixed in)
-    deals.sort(key=lambda d: d["deal_score"], reverse=True)
-    return deals[:limit]
+    return [
+        {
+            "brand": listing.brand,
+            "model": listing.model,
+            "year": listing.year,
+            "price": listing.price,
+            "market_price": listing.market_price,
+            "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
+            "deal_score": int(listing.deal_score),
+            "city": listing.city,
+            "mileage": listing.mileage,
+            "url": listing.url,
+            "source": listing.source,
+            "category": listing.analysis.category if listing.analysis else None,
+            "ai_summary": listing.analysis.ai_summary if listing.analysis else None,
+        }
+        for listing in listings
+    ]
 
 
 @app.get("/api/stats")
@@ -419,7 +379,7 @@ async def api_stats():
         hot_col = func.count(
             case(
                 (
-                    (Listing.is_duplicate.is_(False)) & (Listing.price_diff_pct > 15),
+                    (Listing.is_duplicate.is_(False)) & (Listing.deal_score >= 70),
                     Listing.id,
                 )
             )
@@ -777,7 +737,6 @@ async def dashboard():
 
     from app.db.session import async_session_factory
     from app.models.listing import Listing, ListingAnalysis
-    from app.services.deal_scorer import compute_deal_score
     from app.services.pricing import get_price_model
 
     now = datetime.now(UTC)
@@ -789,7 +748,7 @@ async def dashboard():
         hot_col = func.count(
             case(
                 (
-                    (Listing.is_duplicate.is_(False)) & (Listing.price_diff_pct > 15),
+                    (Listing.is_duplicate.is_(False)) & (Listing.deal_score >= 70),
                     Listing.id,
                 )
             )
@@ -814,62 +773,31 @@ async def dashboard():
         top_stmt = (
             select(Listing)
             .options(selectinload(Listing.analysis))
-            .join(ListingAnalysis)
             .where(
                 Listing.is_duplicate.is_(False),
-                ListingAnalysis.score.isnot(None),
+                Listing.deal_score.isnot(None),
+                Listing.deal_score >= 70,
+                Listing.price > 100_000,
             )
-            .order_by(desc(ListingAnalysis.score))
+            .order_by(desc(Listing.deal_score), desc(Listing.price_diff_pct))
             .limit(5)
         )
         top_result = await session.execute(top_stmt)
         top_listings = list(top_result.scalars().all())
 
-        # Fallback: if fewer than 5 pre-scored, fill from high price_diff_pct
-        if len(top_listings) < 5:
-            remaining = 5 - len(top_listings)
-            scored_ids = {item.id for item in top_listings}
-            fb_stmt = (
-                select(Listing)
-                .options(selectinload(Listing.analysis))
-                .where(
-                    Listing.is_duplicate.is_(False),
-                    Listing.market_price.isnot(None),
-                    Listing.price_diff_pct.isnot(None),
-                    Listing.id.notin_(scored_ids) if scored_ids else True,
-                )
-                .order_by(desc(Listing.price_diff_pct))
-                .limit(remaining * 2)
-            )
-            fb_result = await session.execute(fb_stmt)
-            candidates = list(fb_result.scalars().all())
-            computed = []
-            for listing in candidates:
-                s = await compute_deal_score(listing)
-                computed.append((listing, s))
-            computed.sort(key=lambda x: x[1], reverse=True)
-            top_listings.extend([pair[0] for pair in computed[:remaining]])
-
-        top_deals = []
-        for listing in top_listings:
-            deal_score = (
-                listing.analysis.score
-                if listing.analysis and listing.analysis.score is not None
-                else await compute_deal_score(listing)
-            )
-            top_deals.append(
-                {
-                    "brand": listing.brand,
-                    "model": listing.model,
-                    "year": listing.year,
-                    "price": listing.price,
-                    "market_price": listing.market_price,
-                    "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
-                    "deal_score": int(deal_score),
-                    "url": listing.url,
-                }
-            )
-        top_deals.sort(key=lambda d: d["deal_score"], reverse=True)
+        top_deals = [
+            {
+                "brand": listing.brand,
+                "model": listing.model,
+                "year": listing.year,
+                "price": listing.price,
+                "market_price": listing.market_price,
+                "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else 0,
+                "deal_score": int(listing.deal_score),
+                "url": listing.url,
+            }
+            for listing in top_listings
+        ]
 
         # ── 3. Recent price drops (last 5) ──
         drops_stmt = (

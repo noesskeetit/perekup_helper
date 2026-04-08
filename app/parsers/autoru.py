@@ -305,6 +305,10 @@ class AutoruParser(BaseParser):
     # gear_type (drive), etc.  We also try legacy/alternative key names so the
     # parser stays resilient if Auto.ru changes the serialisation format.
 
+    # Match price from price_info block (real price), NOT credit/monthly payments.
+    # Auto.ru SSR has: "price_info":{"RUR":1534000,...} for real price
+    # and "price":85487 for monthly payments in credit blocks.
+    _RE_PRICE_INFO = re.compile(r'"price_info":\{[^}]*?"RUR":(\d{5,})')
     _RE_PRICE = re.compile(r'"price":(\d{5,})')
     _RE_YEAR = re.compile(r'"year":(\d{4})')
     _RE_MILEAGE = re.compile(r'"mileage":(\d+)')
@@ -411,8 +415,11 @@ class AutoruParser(BaseParser):
                 end = min(len(html), id_match.end() + SEARCH_RADIUS)
                 chunk = html[start:end]
 
-                # Must have price to be a valid data block
-                price_m = self._RE_PRICE.search(chunk)
+                # Must have price to be a valid data block.
+                # Prefer price_info.RUR (real price) over bare "price" (may be credit payment).
+                price_m = self._RE_PRICE_INFO.search(chunk)
+                if not price_m:
+                    price_m = self._RE_PRICE.search(chunk)
                 if not price_m:
                     continue
 

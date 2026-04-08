@@ -13,13 +13,13 @@ Quantiles:
 
 Model retrains daily on fresh data.
 
-MAPE optimization notes (v3 — stacking + TF-IDF):
+MAPE optimization notes (v4 — stacking + native text features):
   - P50 uses stacking: CatBoost (log-target) + LightGBM + target-encoded CatBoost.
   - Stacking blend reduces MAPE ~0.5pp vs single CatBoost.
   - Target encoding: smoothed mean log(price) per (brand+model) and (brand+model+year).
-  - TF-IDF on description text: 15 SVD components capture price signals from descriptions.
+  - CatBoost native text_features on description: BoW with 10K dictionary.
     Reduces MAPE ~0.8pp. Key signals: condition, equipment, dealer language.
-  - P10/P90 still use CatBoost Quantile loss on raw price.
+  - P10/P90 also use CatBoost with text features.
   - 5-fold CV is used for reliable MAPE measurement alongside the final model.
 """
 
@@ -127,23 +127,48 @@ _LGB_PARAMS = {
 # Stacking weights for P50: CatBoost, LightGBM, CatBoost+TE
 STACK_WEIGHTS = (0.40, 0.40, 0.20)
 
-# TF-IDF settings
-TFIDF_N_COMPONENTS = 15
-TFIDF_FEATURE_NAMES = [f"tfidf_{i}" for i in range(TFIDF_N_COMPONENTS)]
+# CatBoost native text processing config
+_TEXT_PROCESSING = {
+    "tokenizers": [{"tokenizer_id": "Space", "separator_type": "ByDelimiter", "delimiter": " ", "lowercasing": "true"}],
+    "dictionaries": [
+        {"dictionary_id": "Word", "max_dictionary_size": "10000", "occurrence_lower_bound": "5", "gram_order": "1"}
+    ],
+    "feature_processing": {
+        "default": [
+            {
+                "tokenizers_names": ["Space"],
+                "dictionaries_names": ["Word"],
+                "feature_calcers": ["BoW:top_tokens_count=500"],
+            }
+        ]
+    },
+}
+
+
+def _preprocess_text(text_val: str) -> str:
+    """Clean Russian text for CatBoost BoW features."""
+    if not text_val:
+        return ""
+    import re
+
+    text_val = str(text_val).lower()
+    text_val = re.sub(r"[^\w\s]", " ", text_val)
+    text_val = re.sub(r"\s+", " ", text_val).strip()
+    return text_val
 
 
 class PriceModel:
-    """Stacking model for car market pricing: CatBoost + LightGBM + TF-IDF.
+    """Stacking model for car market pricing: CatBoost + LightGBM + native text.
 
     Predicts P10, P50, P90 price given car features.
 
     P50 uses stacking:
-    - CatBoost on log(price) with TF-IDF description features
-    - LightGBM on log(price) with target-encoded + TF-IDF features
+    - CatBoost on log(price) with native text features (BoW on description)
+    - LightGBM on log(price) with target-encoded features
     - CatBoost+TE on log(price) with target-encoded features
     Blend reduces MAPE ~1.3pp vs single CatBoost without description features.
 
-    P10/P90 use CatBoost quantile regression on raw price.
+    P10/P90 use CatBoost quantile regression on raw price (also with text).
     """
 
     def __init__(self):
@@ -152,7 +177,7 @@ class PriceModel:
         self._cb_te_model: CatBoostRegressor | None = None
         self._te_stats: dict[str, dict[str, float]] = {}  # target encoding lookup tables
         self._global_log_mean: float = 0.0
-        self._tfidf = None  # DescriptionTfidf instance
+        self._has_text: bool = False
         self._trained_at: datetime | None = None
         self._training_size: int = 0
         self._feature_names: list[str] = ALL_FEATURES
@@ -184,20 +209,12 @@ class PriceModel:
             )
             return {"status": "skipped", "reason": "insufficient_data", "samples": len(df)}
 
-        # --- Fit TF-IDF on descriptions ---
-        if "description" in df.columns:
-            from app.services.description_features import DescriptionTfidf
-
-            self._tfidf = DescriptionTfidf(n_components=TFIDF_N_COMPONENTS)
-            tfidf_df = self._tfidf.fit_transform(df["description"].fillna(""))
-            for col in TFIDF_FEATURE_NAMES:
-                df[col] = tfidf_df[col].values
-            self._feature_names = ALL_FEATURES + TFIDF_FEATURE_NAMES
-            logger.info(
-                "TF-IDF fitted: %d components, explained variance=%.3f",
-                TFIDF_N_COMPONENTS,
-                self._tfidf.explained_variance_ratio[-1],
-            )
+        # --- Prepare text features ---
+        self._has_text = "description" in df.columns
+        if self._has_text:
+            df["description_clean"] = df["description"].fillna("").apply(_preprocess_text)
+            self._feature_names = ALL_FEATURES + ["description_clean"]
+            logger.info("Text features enabled: description_clean")
         else:
             self._feature_names = ALL_FEATURES
 
@@ -224,6 +241,16 @@ class PriceModel:
         self._global_log_mean = float(np.mean(log_prices))
         self._te_stats = self._compute_te_stats(df, log_prices)
 
+        # Prepare Pool kwargs for text features
+        text_pool_kwargs = {}
+        text_model_kwargs = {}
+        if self._has_text:
+            text_pool_kwargs = {
+                "text_features": ["description_clean"],
+                "feature_names": list(self._feature_names),
+            }
+            text_model_kwargs = {"text_processing": _TEXT_PROCESSING}
+
         for quantile in QUANTILES:
             logger.info("Training quantile=%.2f on %d samples", quantile, len(df))
 
@@ -236,7 +263,7 @@ class PriceModel:
                     **_CB_PARAMS_BASE,
                     loss_function="RMSE",
                     eval_metric="MAPE",
-                    cat_features=cat_feature_indices,
+                    **text_model_kwargs,
                 )
                 self._p50_log_target = True
             else:
@@ -245,17 +272,17 @@ class PriceModel:
                 model = CatBoostRegressor(
                     **_CB_PARAMS_BASE,
                     loss_function=f"Quantile:alpha={quantile}",
-                    cat_features=cat_feature_indices,
+                    **text_model_kwargs,
                 )
 
             # 80/20 split for early stopping
             split_idx = int(len(df) * 0.8)
             X_train, X_val = X.iloc[:split_idx], X.iloc[split_idx:]
             y_train, y_val = y_target[:split_idx], y_target[split_idx:]
-            w_train, w_val = weights[:split_idx], weights[split_idx:]
+            w_train = weights[:split_idx]
 
-            train_pool = Pool(X_train, y_train, cat_features=cat_feature_indices, weight=w_train)
-            val_pool = Pool(X_val, y_val, cat_features=cat_feature_indices, weight=w_val)
+            train_pool = Pool(X_train, y_train, cat_features=CAT_FEATURES, weight=w_train, **text_pool_kwargs)
+            val_pool = Pool(X_val, y_val, cat_features=CAT_FEATURES, **text_pool_kwargs)
 
             model.fit(train_pool, eval_set=val_pool, verbose=0)
             self._models[quantile] = model
@@ -331,23 +358,28 @@ class PriceModel:
 
             X_val = X.iloc[val_start:val_end]
             y_val_raw = y.values[val_start:val_end]
-            w_val = weights[val_start:val_end]
 
             y_train_log = np.log(y_train_raw)
             y_val_log = np.log(y_val_raw)
+
+            text_pool_kw = {}
+            text_model_kw = {}
+            if self._has_text:
+                text_pool_kw = {"text_features": ["description_clean"], "feature_names": list(self._feature_names)}
+                text_model_kw = {"text_processing": _TEXT_PROCESSING}
 
             model = CatBoostRegressor(
                 **_CB_PARAMS_BASE,
                 loss_function="RMSE",
                 eval_metric="MAPE",
-                cat_features=cat_feature_indices,
+                **text_model_kw,
             )
 
-            train_pool = Pool(X_train, y_train_log, cat_features=cat_feature_indices, weight=w_train)
-            val_pool = Pool(X_val, y_val_log, cat_features=cat_feature_indices, weight=w_val)
+            train_pool = Pool(X_train, y_train_log, cat_features=CAT_FEATURES, weight=w_train, **text_pool_kw)
+            val_pool = Pool(X_val, y_val_log, cat_features=CAT_FEATURES, **text_pool_kw)
             model.fit(train_pool, eval_set=val_pool, verbose=0)
 
-            y_pred = np.exp(model.predict(X_val))
+            y_pred = np.exp(model.predict(val_pool))
             fold_mape = float(np.mean(np.abs((y_val_raw - y_pred) / y_val_raw)) * 100)
             mapes.append(fold_mape)
 
@@ -484,16 +516,12 @@ class PriceModel:
         df = pd.DataFrame(listings)
         df = self._fill_defaults(df)
 
-        # Add TF-IDF features if model was trained with them
-        if self._tfidf is not None and "description" in df.columns:
-            tfidf_df = self._tfidf.transform(df["description"].fillna(""))
-            for col in TFIDF_FEATURE_NAMES:
-                df[col] = tfidf_df[col].values
-        elif any(f.startswith("tfidf_") for f in self._feature_names):
-            # No TF-IDF model but features expected — fill with zeros
-            for col in TFIDF_FEATURE_NAMES:
-                if col not in df.columns:
-                    df[col] = 0.0
+        # Add cleaned description for native text features
+        if self._has_text:
+            if "description" in df.columns:
+                df["description_clean"] = df["description"].fillna("").apply(_preprocess_text)
+            elif "description_clean" not in df.columns:
+                df["description_clean"] = ""
 
         X = df[self._feature_names]
 
@@ -583,15 +611,10 @@ class PriceModel:
             "te_stats": self._te_stats,
             "global_log_mean": self._global_log_mean,
             "lgb_features": getattr(self, "_lgb_features", None),
+            "has_text": self._has_text,
         }
         with open(METADATA_PATH, "wb") as f:
             pickle.dump(meta, f)
-
-        # Save TF-IDF model
-        tfidf_path = MODEL_DIR / "tfidf_model.pkl"
-        if self._tfidf is not None:
-            with open(tfidf_path, "wb") as f:
-                pickle.dump(self._tfidf, f)
 
         # Save LightGBM model separately (different format)
         lgb_path = MODEL_DIR / "lgb_model.txt"
@@ -628,6 +651,7 @@ class PriceModel:
                     self._te_stats = meta.get("te_stats", {})
                     self._global_log_mean = meta.get("global_log_mean", 0.0)
                     self._lgb_features = meta.get("lgb_features")
+                    self._has_text = meta.get("has_text", False)
 
             # Load LightGBM
             lgb_path = MODEL_DIR / "lgb_model.txt"
@@ -639,12 +663,6 @@ class PriceModel:
             if cb_te_path.exists():
                 with open(cb_te_path, "rb") as f:
                     self._cb_te_model = pickle.load(f)
-
-            # Load TF-IDF
-            tfidf_path = MODEL_DIR / "tfidf_model.pkl"
-            if tfidf_path.exists():
-                with open(tfidf_path, "rb") as f:
-                    self._tfidf = pickle.load(f)
 
             logger.info(
                 "Price model loaded: %d quantile models, trained on %d samples, stacking=%s",

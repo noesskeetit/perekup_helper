@@ -42,15 +42,22 @@ def _create_avito_session():
         logger.error("curl_cffi required. Install: pip install curl_cffi")
         sys.exit(1)
 
-    proxy = os.getenv("PROXY_STRING")
+    proxy_raw = os.getenv("PROXY_STRING", "")
+    proxy_type = os.getenv("PROXY_TYPE", "socks5")
+    if proxy_raw and "://" not in proxy_raw:
+        proxy = f"{proxy_type}://{proxy_raw}"
+    else:
+        proxy = proxy_raw or None
     proxies = {"http": proxy, "https": proxy} if proxy else None
+    logger.info("Using proxy: %s", proxy_type if proxy else "none")
 
     session = cffi_requests.Session(impersonate="chrome", proxies=proxies)
     # Warm up cookies
     try:
-        session.get("https://www.avito.ru/", timeout=20)
-    except Exception:
-        logger.warning("Cookie warmup failed, continuing anyway")
+        resp = session.get("https://www.avito.ru/", timeout=20)
+        logger.info("Cookie warmup: status=%d, size=%d", resp.status_code, len(resp.text))
+    except Exception as e:
+        logger.warning("Cookie warmup failed: %s", e)
 
     return session
 
@@ -114,7 +121,7 @@ async def update_listing(listing_id: str, updates: dict) -> bool:
         if not set_parts:
             return False
 
-        sql = f"UPDATE listings SET {', '.join(set_parts)} WHERE id = :lid::uuid"
+        sql = f"UPDATE listings SET {', '.join(set_parts)} WHERE id = CAST(:lid AS uuid)"
         await session.execute(text(sql), params)
         await session.commit()
         return True

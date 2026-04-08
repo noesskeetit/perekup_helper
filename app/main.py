@@ -195,6 +195,64 @@ async def hot_deals(
     return results
 
 
+@app.get("/api/export-csv")
+async def export_csv(
+    min_diff: float = 10.0,
+    limit: int = 500,
+    session: AsyncSession = Depends(get_session),
+):
+    """Export hot deals as CSV for spreadsheet analysis."""
+    import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
+    from sqlalchemy import select
+
+    from app.models.listing import Listing
+
+    stmt = (
+        select(Listing)
+        .where(
+            Listing.is_duplicate.is_(False),
+            Listing.price > 0,
+            Listing.price_diff_pct >= min_diff,
+        )
+        .order_by(Listing.price_diff_pct.desc())
+        .limit(min(limit, 1000))
+    )
+    result = await session.execute(stmt)
+    listings = result.scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        ["brand", "model", "year", "price", "market_price", "diff_%", "deal_score", "mileage", "city", "source", "url"]
+    )
+    for row in listings:
+        writer.writerow(
+            [
+                row.brand,
+                row.model,
+                row.year,
+                row.price,
+                row.market_price,
+                float(row.price_diff_pct) if row.price_diff_pct else "",
+                row.deal_score or "",
+                row.mileage or "",
+                row.city or "",
+                row.source,
+                row.url,
+            ]
+        )
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=hot_deals.csv"},
+    )
+
+
 @app.get("/api/price-drops")
 async def price_drops(
     min_drop_pct: float = 1.0,

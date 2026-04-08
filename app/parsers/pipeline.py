@@ -140,6 +140,22 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
             logger.exception("Pipeline: analysis failed")
             result.errors.append(f"analysis: {exc}")
 
+    # Step 5: Deal scoring (runs on all unscored listings, not just new)
+    try:
+        from app.services.deal_scorer import score_deals
+
+        deal_scored = 0
+        while True:
+            batch = await score_deals(limit=1000)
+            if batch == 0:
+                break
+            deal_scored += batch
+        if deal_scored:
+            logger.info("Pipeline: deal-scored %d listings", deal_scored)
+    except Exception as exc:
+        logger.exception("Pipeline: deal scoring failed")
+        result.errors.append(f"deal_scoring: {exc}")
+
     # Log per-source metrics
     for pr in result.source_results:
         lpb = pr.listings_per_ban

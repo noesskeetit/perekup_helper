@@ -736,6 +736,23 @@ async def list_brands(session: AsyncSession = Depends(get_session)):
     return [{"brand": row[0], "count": row[1]} for row in result.all()]
 
 
+@app.get("/api/models/{brand}")
+async def list_models(brand: str, session: AsyncSession = Depends(get_session)):
+    """List all models for a brand with listing counts."""
+    from sqlalchemy import func, select
+
+    from app.models.listing import Listing
+
+    stmt = (
+        select(Listing.model, func.count(Listing.id).label("count"))
+        .where(Listing.is_duplicate.is_(False), func.lower(Listing.brand) == brand.lower())
+        .group_by(Listing.model)
+        .order_by(func.count(Listing.id).desc())
+    )
+    result = await session.execute(stmt)
+    return [{"model": row[0], "count": row[1]} for row in result.all()]
+
+
 @app.get("/api/model-info")
 async def model_info():
     """Get current price model metadata."""

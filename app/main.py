@@ -522,6 +522,67 @@ async def price_estimate(listing_id: str):
     }
 
 
+@app.get("/api/search")
+async def search_listings(
+    brand: str | None = None,
+    model: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    price_from: int | None = None,
+    price_to: int | None = None,
+    min_discount: float | None = None,
+    source: str | None = None,
+    limit: int = 20,
+):
+    """Search listings with filters. Returns top results by deal_score."""
+    from sqlalchemy import func, select
+
+    from app.db.session import async_session_factory
+    from app.models.listing import Listing
+
+    async with async_session_factory() as session:
+        stmt = select(Listing).where(Listing.is_duplicate.is_(False), Listing.price > 0)
+
+        if brand:
+            stmt = stmt.where(func.lower(Listing.brand) == brand.lower())
+        if model:
+            stmt = stmt.where(func.lower(Listing.model) == model.lower())
+        if year_from:
+            stmt = stmt.where(Listing.year >= year_from)
+        if year_to:
+            stmt = stmt.where(Listing.year <= year_to)
+        if price_from:
+            stmt = stmt.where(Listing.price >= price_from)
+        if price_to:
+            stmt = stmt.where(Listing.price <= price_to)
+        if min_discount:
+            stmt = stmt.where(Listing.price_diff_pct >= min_discount)
+        if source:
+            stmt = stmt.where(Listing.source == source.lower())
+
+        stmt = stmt.order_by(Listing.deal_score.desc().nullslast(), Listing.created_at.desc()).limit(min(limit, 50))
+
+        result = await session.execute(stmt)
+        listings = result.scalars().all()
+
+    return [
+        {
+            "brand": listing.brand,
+            "model": listing.model,
+            "year": listing.year,
+            "price": listing.price,
+            "market_price": listing.market_price,
+            "diff_pct": float(listing.price_diff_pct) if listing.price_diff_pct else None,
+            "deal_score": listing.deal_score,
+            "mileage": listing.mileage,
+            "city": listing.city,
+            "source": listing.source,
+            "url": listing.url,
+        }
+        for listing in listings
+    ]
+
+
 @app.get("/api/model-info")
 async def model_info():
     """Get current price model metadata."""

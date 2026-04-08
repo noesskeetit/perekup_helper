@@ -15,6 +15,7 @@ HELP_TEXT = (
     "/filters — настроить фильтры (марка, модель, цена, скидка)\n"
     "/deals — топ-5 горячих предложений прямо сейчас\n"
     "/drops — свежие снижения цен\n"
+    "/search Toyota Camry — поиск по марке/модели\n"
     "/stats — статистика уведомлений\n"
     "/stop — приостановить уведомления\n"
     "/help — эта справка"
@@ -123,6 +124,58 @@ async def cmd_drops(message: Message) -> None:
         url = drop.get("url", "")
         lines.append(f"{i}. <b>{brand} {model}</b> {year}")
         lines.append(f"   💰 {price:,.0f}₽  📉 Снижение: {drop_pct:.0f}%")
+        if url:
+            lines.append(f"   🔗 {url}")
+        lines.append("")
+
+    await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
+
+
+@router.message(Command("search"))
+async def cmd_search(message: Message) -> None:
+    """Search listings by brand and model. Usage: /search Toyota Camry"""
+    args = message.text.strip().split(maxsplit=2)
+    if len(args) < 2:
+        await message.answer("Использование: /search <марка> [модель]\nПример: /search Toyota Camry")
+        return
+
+    brand = args[1]
+    model_name = args[2] if len(args) > 2 else None
+
+    try:
+        import httpx
+
+        params = {"brand": brand, "limit": 5}
+        if model_name:
+            params["model"] = model_name
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://localhost:8000/api/search", params=params, timeout=10)
+            if resp.status_code != 200:
+                await message.answer("Сервер недоступен. Попробуй позже.")
+                return
+            results = resp.json()
+    except Exception:
+        await message.answer("Не удалось выполнить поиск. Попробуй позже.")
+        return
+
+    if not results:
+        query = f"{brand} {model_name}" if model_name else brand
+        await message.answer(f"Ничего не найдено по запросу: {query}")
+        return
+
+    query = f"{brand} {model_name}" if model_name else brand
+    lines = [f"🔍 <b>Результаты: {query}</b> ({len(results)} шт)\n"]
+    for i, r in enumerate(results[:5], 1):
+        diff = r.get("diff_pct")
+        diff_str = f"  📉 {diff:+.0f}%" if diff else ""
+        score = r.get("deal_score")
+        score_str = f"  ⭐{score:.0f}" if score else ""
+        mil = r.get("mileage")
+        mil_str = f"  🛣{mil:,}км" if mil else ""
+        lines.append(f"{i}. <b>{r['brand']} {r['model']}</b> {r['year']}")
+        lines.append(f"   💰 {r['price']:,.0f}₽{diff_str}{score_str}{mil_str}")
+        url = r.get("url", "")
         if url:
             lines.append(f"   🔗 {url}")
         lines.append("")

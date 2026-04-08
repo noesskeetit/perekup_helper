@@ -67,6 +67,7 @@ async def train_model() -> dict:
                 "is_dealer": int(row.is_dealer) if row.is_dealer else 0,
                 "listing_date": row.listing_date,
                 "created_at": row.created_at,
+                "description": getattr(row, "description", "") or "",
             }
         )
 
@@ -207,6 +208,7 @@ async def score_listings(limit: int = 500) -> int:
                     "log_mileage": math.log(mileage + 1),
                     "mileage_per_year": mileage / max(car_age, 1),
                     "mileage_ratio": mileage / (car_age * 15_000 + 1),
+                    "description": listing.description or "",
                 }
             )
 

@@ -86,6 +86,7 @@ def _make_listing_ns(
     listing_date: datetime | None = None,
     created_at: datetime | None = None,
     is_duplicate: bool = False,
+    description: str = "",
 ) -> SimpleNamespace:
     """Lightweight listing stub for score_listings tests."""
     now = datetime.now(UTC)
@@ -112,6 +113,8 @@ def _make_listing_ns(
         listing_date=listing_date or now,
         created_at=created_at or now,
         is_duplicate=is_duplicate,
+        description=description,
+        analysis=None,
     )
 
 
@@ -146,6 +149,7 @@ class TestIQROutlierRemoval:
 
         mock_result = MagicMock()
         mock_scalars = MagicMock()
+        mock_scalars.unique.return_value = mock_scalars
         mock_scalars.all.return_value = listings
         mock_result.scalars.return_value = mock_scalars
 
@@ -191,6 +195,7 @@ class TestIQROutlierRemoval:
 
         mock_result = MagicMock()
         mock_scalars = MagicMock()
+        mock_scalars.unique.return_value = mock_scalars
         mock_scalars.all.return_value = listings
         mock_result.scalars.return_value = mock_scalars
 
@@ -245,6 +250,7 @@ class TestStaleListingFilter:
 
         mock_result = MagicMock()
         mock_scalars = MagicMock()
+        mock_scalars.unique.return_value = mock_scalars
         mock_scalars.all.return_value = listings
         mock_result.scalars.return_value = mock_scalars
 
@@ -280,6 +286,7 @@ class TestStaleListingFilter:
 
         mock_result = MagicMock()
         mock_scalars = MagicMock()
+        mock_scalars.unique.return_value = mock_scalars
         mock_scalars.all.return_value = listings
         mock_result.scalars.return_value = mock_scalars
 

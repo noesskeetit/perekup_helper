@@ -22,60 +22,74 @@ CURRENT_YEAR = 2026
 async def compute_deal_score(listing: Listing) -> int:
     """Score 0-100 how good a deal this listing is.
 
-    Factors (weights):
-    - Price vs market (40%): +2 pts per % below market
-    - AI category (25%): clean +10, damaged -20, bad_docs -30
-    - Mileage per year (15%): low km bonus, high km penalty
-    - Photos (10%): more photos = transparent seller
-    - Freshness (10%): newer listings are more actionable
+    Factors:
+    - Price vs market: +2 pts per % below market (capped at 50% to avoid model errors)
+    - AI category: clean +10, damaged/bad_docs/debtor → hard cap
+    - Mileage per year: low km bonus, high km penalty
+    - Photos: more photos = transparent seller
+    - Freshness: newer listings are more actionable
     - Owners count: fewer owners = better
+    - Data completeness: penalize missing critical fields
+    - Minimum price sanity: very cheap listings are suspicious
     """
     score = 50  # neutral baseline
 
-    # Price vs market (biggest factor): +2 points per % below market, -2 per % above
-    if listing.price_diff_pct:
-        score += float(listing.price_diff_pct) * 2
+    # --- Additive factors (bonuses and penalties) ---
 
-    # AI category — hard cap for problem listings
+    # Price vs market: +1.5 pts per % below, capped at 30% diff
+    # Above 30% is likely a model error for rare/old cars, not a real deal
+    if listing.price_diff_pct:
+        diff = float(listing.price_diff_pct)
+        capped_diff = max(-30, min(30, diff))
+        score += capped_diff * 1.5
+
+    # AI category bonus (only additive ones here; hard caps applied below)
     if listing.analysis:
         category = listing.analysis.category
         if category == "clean":
             score += 10
-        elif category == "damaged_body":
-            score = min(score, 15)  # hard cap: damaged cars are never "hot deals"
-        elif category == "bad_docs":
-            score = min(score, 10)  # hard cap: legal problems = avoid
-        elif category == "debtor":
-            score = min(score, 10)  # hard cap: debt = avoid
         elif category == "complex_but_profitable":
-            score += 5  # risky but potentially good
+            score += 5
 
     # Low mileage bonus / high mileage penalty
     if listing.mileage and listing.year:
         car_age = max(1, CURRENT_YEAR - listing.year)
         mileage_per_year = listing.mileage / car_age
         if mileage_per_year < 10000:
-            score += 5  # low mileage
+            score += 5
         elif mileage_per_year > 30000:
-            score -= 5  # high mileage
+            score -= 5
 
-    # Has photos bonus (transparent seller)
-    if listing.photo_count and listing.photo_count > 5:
-        score += 3
-    elif listing.photo_count and listing.photo_count > 10:
+    # Has photos bonus (transparent seller) — check higher threshold first
+    if listing.photo_count and listing.photo_count > 10:
         score += 5
+    elif listing.photo_count and listing.photo_count > 5:
+        score += 3
 
-    # Freshness bonus (listed < 24h ago)
+    # Data completeness penalty — missing critical fields reduce confidence
+    missing_fields = 0
+    if not listing.mileage:
+        missing_fields += 1
+    if not listing.year:
+        missing_fields += 1
+    if not getattr(listing, "body_type", None) or listing.body_type == "unknown":
+        missing_fields += 1
+    if missing_fields >= 2:
+        score -= 8
+    elif missing_fields == 1:
+        score -= 3
+
+    # Freshness bonus
     if listing.created_at:
         from datetime import UTC, datetime
 
         age_hours = (datetime.now(UTC) - listing.created_at).total_seconds() / 3600
         if age_hours < 6:
-            score += 8  # very fresh
+            score += 8
         elif age_hours < 24:
-            score += 4  # fresh
+            score += 4
         elif age_hours > 72:
-            score -= 3  # stale
+            score -= 3
 
     # Owners count bonus/penalty
     if listing.owners_count:
@@ -84,7 +98,33 @@ async def compute_deal_score(listing: Listing) -> int:
         elif listing.owners_count >= 4:
             score -= 5
 
-    # Keyword-based red flags from description (catches problems even without AI analysis)
+    # Mild penalty for very cheap cars (not a hard cap)
+    price = getattr(listing, "price", 0) or 0
+    if 0 < price < 200_000:
+        score -= 5
+
+    # --- Hard caps (applied LAST, before final clamp) ---
+    # These override the score regardless of bonuses above.
+
+    # Incomplete data cap — can't trust high scores without mileage + body info
+    if missing_fields >= 2:
+        score = min(score, 65)
+    elif missing_fields == 1:
+        score = min(score, 80)
+
+    # Suspiciously cheap — likely garbage data or scam
+    if 0 < price < 100_000:
+        score = min(score, 20)
+
+    # AI category hard caps for problem listings
+    if listing.analysis:
+        category = listing.analysis.category
+        if category == "damaged_body":
+            score = min(score, 15)
+        elif category in ("bad_docs", "debtor"):
+            score = min(score, 10)
+
+    # Keyword red flags from description
     desc = (listing.description or "").lower()
     red_flags = [
         "на запчасти",

@@ -312,17 +312,31 @@ async def score_listings(limit: int = 500) -> int:
 
         # Update DB
         scored = 0
+        skipped_sanity = 0
         for listing, pred in zip(listings, predictions, strict=False):
             p50 = pred["p50"]
             pct = pred["price_vs_market_pct"]
 
             if p50 and p50 > 0:
+                # Sanity check: skip wildly wrong predictions.
+                # If p50 is >3x or <0.33x the actual price, the model
+                # likely has too few examples for this brand+model.
+                actual = listing.price
+                if actual > 0:
+                    ratio = p50 / actual
+                    if ratio > 2.5 or ratio < 0.4:
+                        skipped_sanity += 1
+                        continue
+
                 listing.market_price = p50
                 # Clamp to NUMERIC(5,2) range: -999.99 .. 999.99
                 if pct is not None:
                     pct = max(-999.99, min(999.99, pct))
                 listing.price_diff_pct = pct
                 scored += 1
+
+        if skipped_sanity:
+            logger.info("Skipped %d listings with unreliable predictions (>3x deviation)", skipped_sanity)
 
         try:
             await session.commit()

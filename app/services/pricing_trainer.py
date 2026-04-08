@@ -7,13 +7,22 @@ Outlier removal (v2):
   - IQR bounds tightened to 1.5x on both sides (was asymmetric 1.5/3.0).
   - Secondary MAD filter on log(price) per segment removes mis-priced listings
     that survive IQR (e.g., a 2M car listed at 200K by mistake).
+
+MLflow integration (v3):
+  - Each training run is logged to MLflow (local file tracking in mlruns/).
+  - New models are saved to a temp directory first, then promoted to
+    production only if P50 MAPE improves (or no prior model exists).
+  - Rejected models are tagged in MLflow for auditability.
 """
 
 from __future__ import annotations
 
 import logging
 import math
+import shutil
+import tempfile
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -21,7 +30,8 @@ from sqlalchemy import select
 
 from app.db.session import async_session_factory
 from app.models.listing import Listing
-from app.services.pricing import CURRENT_YEAR, get_price_model
+from app.services.mlflow_tracking import log_training_run, promote_if_better
+from app.services.pricing import CURRENT_YEAR, MODEL_DIR, get_price_model
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +154,38 @@ async def train_model() -> dict:
     stats = model.train(df)
 
     if stats.get("status") == "trained":
-        model.save()
+        # Save to a temp directory first so we can compare before promoting
+        tmp_dir = Path(tempfile.mkdtemp(prefix="perekup_model_"))
+        try:
+            model.save(tmp_dir / "price_model.pkl")
+
+            # Log the run to MLflow
+            log_training_run(stats, tmp_dir)
+
+            # Promote only if MAPE improved (or no prior model exists)
+            promoted = promote_if_better(stats, tmp_dir)
+
+            if promoted:
+                # Reload the model from production dir so singleton is current
+                model.load()
+                logger.info("New model promoted to production")
+            else:
+                # Restore previous model from production dir
+                if (MODEL_DIR / "price_model.pkl").exists():
+                    model.load()
+                    logger.info("Kept previous production model (new model rejected)")
+                else:
+                    # No previous model -- save anyway as first baseline
+                    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+                    for f in tmp_dir.iterdir():
+                        shutil.copy2(str(f), str(MODEL_DIR / f.name))
+                    model.load()
+                    logger.info("No previous model, saved as first baseline")
+
+            stats["mlflow_promoted"] = promoted
+        finally:
+            # Clean up temp directory
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return stats
 

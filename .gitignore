@@ -17,3 +17,4 @@ logs/
 storage/
 catboost_info/
 models/
+mlruns/

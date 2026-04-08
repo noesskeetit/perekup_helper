@@ -334,3 +334,23 @@ async def test_api_health_detailed(async_client):
     assert "status" in data
     assert "db" in data
     assert "model" in data
+
+
+@pytest.mark.asyncio
+async def test_api_price_calculator(async_client):
+    """Price calculator returns price estimate when model is trained."""
+    mock_pricing = MagicMock()
+    mock_model = MagicMock()
+    mock_model.is_trained = True
+    mock_model.predict_one.return_value = {"p10": 1000000, "p50": 1500000, "p90": 2000000}
+    mock_pricing.get_price_model = MagicMock(return_value=mock_model)
+
+    with patch.dict("sys.modules", {"app.services.pricing": mock_pricing}):
+        resp = await async_client.get("/api/price-calculator?brand=Toyota&model=Camry&year=2020")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["brand"] == "Toyota"
+    assert data["model"] == "Camry"
+    assert data["year"] == 2020
+    assert "estimated_price" in data
+    assert "price_range" in data

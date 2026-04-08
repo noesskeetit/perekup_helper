@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    bot_token: str
+    bot_token: str = ""  # Required for bot to run, but allow empty for tests/imports
     database_url: str = "sqlite+aiosqlite:///./data/bot.db"
     app_database_url: str | None = None
     check_interval_seconds: int = 300

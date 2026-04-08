@@ -523,13 +523,16 @@ class PriceModel:
             elif "description_clean" not in df.columns:
                 df["description_clean"] = ""
 
-        X = df[self._feature_names]
+        # Ensure feature list includes description_clean when model uses text
+        feature_names = list(self._feature_names)
+        if self._has_text and "description_clean" not in feature_names:
+            feature_names.append("description_clean")
+        X = df[feature_names]
 
         # Build Pool for prediction (needed for text features)
-        pool_kwargs: dict = {"cat_features": CAT_FEATURES}
-        if self._has_text and "description_clean" in X.columns:
+        pool_kwargs: dict = {"cat_features": CAT_FEATURES, "feature_names": feature_names}
+        if self._has_text:
             pool_kwargs["text_features"] = ["description_clean"]
-            pool_kwargs["feature_names"] = list(self._feature_names)
         pred_pool = Pool(X, **pool_kwargs)
 
         results = []

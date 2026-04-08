@@ -118,7 +118,13 @@ async def retrain_model_now():
     scored = 0
     if stats.get("status") == "trained":
         scored = await score_listings(limit=5000)
-    return {"training": stats, "scored": scored}
+
+    # Also run deal scoring
+    from app.services.deal_scorer import score_deals
+
+    deal_scored = await score_deals(limit=5000)
+
+    return {"training": stats, "price_scored": scored, "deal_scored": deal_scored}
 
 
 @app.post("/api/run-analysis")

@@ -198,11 +198,11 @@ async def hot_deals(
 
 @app.get("/api/export-csv")
 async def export_csv(
-    min_diff: float = 10.0,
+    min_score: int = 60,
     limit: int = 500,
     session: AsyncSession = Depends(get_session),
 ):
-    """Export hot deals as CSV for spreadsheet analysis."""
+    """Export deals as CSV for spreadsheet analysis. Filter by deal_score."""
     import csv
     import io
 
@@ -216,9 +216,9 @@ async def export_csv(
         .where(
             Listing.is_duplicate.is_(False),
             Listing.price > 0,
-            Listing.price_diff_pct >= min_diff,
+            Listing.deal_score >= min_score,
         )
-        .order_by(Listing.price_diff_pct.desc())
+        .order_by(Listing.deal_score.desc())
         .limit(min(limit, 1000))
     )
     result = await session.execute(stmt)
@@ -227,7 +227,21 @@ async def export_csv(
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(
-        ["brand", "model", "year", "price", "market_price", "diff_%", "deal_score", "mileage", "city", "source", "url"]
+        [
+            "brand",
+            "model",
+            "year",
+            "price",
+            "market_price",
+            "diff_%",
+            "deal_score",
+            "mileage",
+            "body_type",
+            "owners",
+            "city",
+            "source",
+            "url",
+        ]
     )
     for row in listings:
         writer.writerow(
@@ -238,8 +252,10 @@ async def export_csv(
                 row.price,
                 row.market_price,
                 float(row.price_diff_pct) if row.price_diff_pct else "",
-                row.deal_score or "",
+                int(row.deal_score) if row.deal_score else "",
                 row.mileage or "",
+                row.body_type or "",
+                row.owners_count or "",
                 row.city or "",
                 row.source,
                 row.url,

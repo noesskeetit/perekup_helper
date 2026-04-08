@@ -1,3 +1,5 @@
+import contextlib
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -16,6 +18,7 @@ HELP_TEXT = (
     "/deals — топ-5 горячих предложений прямо сейчас\n"
     "/drops — свежие снижения цен\n"
     "/search Toyota Camry — поиск по марке/модели\n"
+    "/calc Toyota Camry 2020 — оценка рыночной цены\n"
     "/stats — статистика уведомлений\n"
     "/stop — приостановить уведомления\n"
     "/help — эта справка"
@@ -181,3 +184,58 @@ async def cmd_search(message: Message) -> None:
         lines.append("")
 
     await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
+
+
+@router.message(Command("calc"))
+async def cmd_calc(message: Message) -> None:
+    """Estimate market price. Usage: /calc Toyota Camry 2020 [mileage]"""
+    args = message.text.strip().split()
+    if len(args) < 4:
+        await message.answer(
+            "Использование: /calc <марка> <модель> <год> [пробег]\nПример: /calc Toyota Camry 2020 100000"
+        )
+        return
+
+    brand = args[1]
+    model_name = args[2]
+    try:
+        year = int(args[3])
+    except ValueError:
+        await message.answer("Год должен быть числом. Пример: /calc Toyota Camry 2020")
+        return
+
+    mileage = 0
+    if len(args) > 4:
+        with contextlib.suppress(ValueError):
+            mileage = int(args[4])
+
+    try:
+        import httpx
+
+        params = {"brand": brand, "model": model_name, "year": year, "mileage": mileage}
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://localhost:8000/api/price-calculator", params=params, timeout=10)
+            if resp.status_code != 200:
+                await message.answer("Ошибка оценки. Попробуй позже.")
+                return
+            data = resp.json()
+    except Exception:
+        await message.answer("Не удалось оценить цену. Попробуй позже.")
+        return
+
+    if "error" in data:
+        await message.answer(f"Ошибка: {data['error']}")
+        return
+
+    est = data.get("estimated_price", 0)
+    low = data.get("price_range", {}).get("low", 0)
+    high = data.get("price_range", {}).get("high", 0)
+    mil_str = f"\n🛣 Пробег: {mileage:,} км" if mileage else ""
+
+    await message.answer(
+        f"💰 <b>Оценка: {brand} {model_name} {year}</b>{mil_str}\n\n"
+        f"📊 Рыночная цена: <b>{est:,.0f} ₽</b>\n"
+        f"📉 Минимум (P10): {low:,.0f} ₽\n"
+        f"📈 Максимум (P90): {high:,.0f} ₽",
+        parse_mode="HTML",
+    )

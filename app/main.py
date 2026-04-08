@@ -412,6 +412,56 @@ async def api_stats():
     }
 
 
+@app.get("/api/price-calculator")
+async def price_calculator(
+    brand: str,
+    model: str,
+    year: int,
+    mileage: int = 0,
+    engine_volume: float = 0.0,
+    transmission: str = "unknown",
+    city: str = "unknown",
+):
+    """Estimate market price for any car by parameters (no listing_id needed)."""
+    from app.services.pricing import get_price_model
+
+    pm = get_price_model()
+    if not pm.is_trained:
+        return {"error": "model not trained"}
+
+    result = pm.predict_one(
+        {
+            "brand": brand,
+            "model": model,
+            "year": year,
+            "mileage": mileage,
+            "price": 0,
+            "source": "manual",
+            "city": city,
+            "engine_type": "unknown",
+            "transmission": transmission,
+            "drive_type": "unknown",
+            "body_type": "unknown",
+            "engine_volume": engine_volume,
+            "power_hp": 0,
+            "owners_count": 0,
+            "photo_count": 0,
+            "is_dealer": 0,
+            "listing_date": None,
+            "created_at": None,
+            "description": "",
+        }
+    )
+    return {
+        "brand": brand,
+        "model": model,
+        "year": year,
+        "mileage": mileage,
+        "estimated_price": result.get("p50"),
+        "price_range": {"low": result.get("p10"), "high": result.get("p90")},
+    }
+
+
 @app.get("/api/price-estimate/{listing_id}")
 async def price_estimate(listing_id: str):
     """Ensemble price estimate: CatBoost + comparable sales + Avito estimate.

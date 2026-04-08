@@ -25,14 +25,34 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://perekup:${POSTGRES_PASSWORD}@db:5432/perekup_helper
-      - REDIS_URL=redis://redis:6379/0
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DATABASE_URL=sqlite+aiosqlite:///./data/bot.db
+      - APP_DATABASE_URL=postgresql+asyncpg://perekup:${POSTGRES_PASSWORD}@db:5432/perekup_helper
+    volumes:
+      - botdata:/app/data
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     command: ["python", "-m", "bot.main"]
+
+  scheduler:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://perekup:${POSTGRES_PASSWORD}@db:5432/perekup_helper
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "while true; do
+        echo '[scheduler] Running pipeline...' &&
+        python -c 'import asyncio; from app.parsers.pipeline import run_pipeline; asyncio.run(run_pipeline())' &&
+        echo '[scheduler] Running retrain...' &&
+        python -c 'import asyncio; from app.services.pricing_trainer import train_model, score_listings; asyncio.run(train_model()); asyncio.run(score_listings(limit=5000))' &&
+        echo '[scheduler] Done. Sleeping 6h...' &&
+        sleep 21600;
+      done"
 
   db:
     image: postgres:16-alpine
@@ -60,3 +80,4 @@ services:
 
 volumes:
   pgdata:
+  botdata:

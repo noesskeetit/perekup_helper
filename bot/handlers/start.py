@@ -85,10 +85,13 @@ async def cmd_deals(message: Message) -> None:
         model = deal.get("model", "?")
         year = deal.get("year", "?")
         price = deal.get("price", 0)
-        diff = deal.get("price_diff_pct", 0)
+        diff = deal.get("diff_pct", deal.get("price_diff_pct", 0))
+        score = deal.get("deal_score", 0)
+        market = deal.get("market_price")
         url = deal.get("url", "")
-        lines.append(f"{i}. <b>{brand} {model}</b> {year}")
-        lines.append(f"   💰 {price:,.0f}₽  📉 {diff:+.0f}%")
+        lines.append(f"{i}. <b>{brand} {model}</b> {year}  ⭐{score}")
+        market_str = f"  (рынок ~{market:,.0f}₽)" if market else ""
+        lines.append(f"   💰 {price:,.0f}₽{market_str}")
         if url:
             lines.append(f"   🔗 {url}")
         lines.append("")

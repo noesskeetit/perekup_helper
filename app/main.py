@@ -706,6 +706,24 @@ async def list_brands(session: AsyncSession = Depends(get_session)):
     return [{"brand": row[0], "count": row[1]} for row in result.all()]
 
 
+@app.get("/api/cities")
+async def list_cities(session: AsyncSession = Depends(get_session)):
+    """List all cities with listing counts."""
+    from sqlalchemy import func, select
+
+    from app.models.listing import Listing
+
+    stmt = (
+        select(Listing.city, func.count(Listing.id).label("count"))
+        .where(Listing.is_duplicate.is_(False), Listing.city.isnot(None))
+        .group_by(Listing.city)
+        .having(func.count(Listing.id) >= 10)
+        .order_by(func.count(Listing.id).desc())
+    )
+    result = await session.execute(stmt)
+    return [{"city": row[0], "count": row[1]} for row in result.all()]
+
+
 @app.get("/api/models/{brand}")
 async def list_models(brand: str, session: AsyncSession = Depends(get_session)):
     """List all models for a brand with listing counts."""

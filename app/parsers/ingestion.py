@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
@@ -59,6 +59,8 @@ async def ingest_listings(listings: list[ParsedListing], source: str) -> ParseRe
                     )
                 else:
                     result.duplicates_skipped += 1
+                # Touch updated_at so we know the listing is still active on the source
+                existing.updated_at = datetime.now(UTC)
                 continue
 
             listing = Listing(

@@ -4,7 +4,21 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, Uuid, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -61,9 +75,17 @@ class Listing(Base):
     pts_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
     customs_cleared: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     photo_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
-    is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false", index=True)
+    is_duplicate: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     canonical_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    deal_score: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    duplicate_of_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("listings.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
@@ -73,9 +95,7 @@ class Listing(Base):
 
 class ListingAnalysis(Base):
     __tablename__ = "listing_analysis"
-    __table_args__ = (
-        Index("ix_analysis_category", "category"),
-    )
+    __table_args__ = (Index("ix_analysis_category", "category"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     listing_id: Mapped[uuid.UUID] = mapped_column(

@@ -106,6 +106,7 @@ async def score_deals(limit: int = 500) -> int:
             .where(
                 Listing.is_duplicate.is_(False),
                 Listing.price > 0,
+                Listing.deal_score.is_(None),
             )
             .order_by(Listing.created_at.desc())
             .limit(limit)

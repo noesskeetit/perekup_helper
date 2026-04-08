@@ -68,6 +68,17 @@ DEFAULT_SEARCHES = [
     # Samara (51)
     {"url": "https://auto.ru/cars/vaz/used/?geo_id=51&price_from=100000&price_to=1000000"},
     {"url": "https://auto.ru/cars/toyota/used/?geo_id=51&price_from=100000&price_to=1500000"},
+    # Moscow — popular budget brands
+    {"url": "https://auto.ru/cars/vaz/used/?geo_id=213&price_from=100000&price_to=1000000"},
+    {"url": "https://auto.ru/cars/renault/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    {"url": "https://auto.ru/cars/ford/used/?geo_id=213&price_from=100000&price_to=1500000"},
+    # Ekaterinburg (54)
+    {"url": "https://auto.ru/cars/toyota/used/?geo_id=54&price_from=100000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/vaz/used/?geo_id=54&price_from=100000&price_to=1000000"},
+    {"url": "https://auto.ru/cars/kia/used/?geo_id=54&price_from=100000&price_to=1500000"},
+    # Novosibirsk (65)
+    {"url": "https://auto.ru/cars/toyota/used/?geo_id=65&price_from=100000&price_to=2000000"},
+    {"url": "https://auto.ru/cars/hyundai/used/?geo_id=65&price_from=100000&price_to=1500000"},
 ]
 
 # Auto.ru stores data in __SSR_DATA__ (previously was __INITIAL_STATE__)

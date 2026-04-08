@@ -525,11 +525,18 @@ class PriceModel:
 
         X = df[self._feature_names]
 
+        # Build Pool for prediction (needed for text features)
+        pool_kwargs: dict = {"cat_features": CAT_FEATURES}
+        if self._has_text and "description_clean" in X.columns:
+            pool_kwargs["text_features"] = ["description_clean"]
+            pool_kwargs["feature_names"] = list(self._feature_names)
+        pred_pool = Pool(X, **pool_kwargs)
+
         results = []
         predictions = {}
         for quantile, model in self._models.items():
             key = f"p{int(quantile * 100)}"
-            raw_pred = model.predict(X)
+            raw_pred = model.predict(pred_pool)
             # P50: use stacking if available, else single CatBoost
             if abs(quantile - 0.50) < 1e-9 and self._p50_log_target:
                 cb_p50 = np.exp(raw_pred)

@@ -208,7 +208,7 @@ async def score_listings(limit: int = 500) -> int:
                     "log_mileage": math.log(mileage + 1),
                     "mileage_per_year": mileage / max(car_age, 1),
                     "mileage_ratio": mileage / (car_age * 15_000 + 1),
-                    "description": listing.description or "",
+                    "description": getattr(listing, "description", "") or "",
                 }
             )
 

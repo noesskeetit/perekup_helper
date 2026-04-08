@@ -51,7 +51,29 @@ app.include_router(stats_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """Health check with DB connectivity and model status."""
+    from app.db.session import async_session_factory
+
+    checks = {"status": "ok", "db": "unknown", "model": "unknown"}
+    try:
+        async with async_session_factory() as session:
+            from sqlalchemy import text
+
+            await session.execute(text("SELECT 1"))
+        checks["db"] = "ok"
+    except Exception:
+        checks["db"] = "error"
+        checks["status"] = "degraded"
+
+    try:
+        from app.services.pricing import get_price_model
+
+        model = get_price_model()
+        checks["model"] = "trained" if model.is_trained else "not_trained"
+    except Exception:
+        checks["model"] = "error"
+
+    return checks
 
 
 @app.post("/api/run-pipeline")

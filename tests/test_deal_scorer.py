@@ -34,6 +34,7 @@ def _make_listing(
         photo_count=photo_count,
         created_at=created_at,
         owners_count=owners_count,
+        description="",
     )
 
 
@@ -84,28 +85,28 @@ class TestLowScore:
     """damaged_body category should heavily penalize the score."""
 
     async def test_damaged_body_at_market_price(self):
-        # 50 + 0 (no diff) - 20 (damaged) = 30
+        # damaged_body: hard cap at 15 regardless of price
         listing = _make_listing(price_diff_pct=0.0, category="damaged_body")
         score = await compute_deal_score(listing)
-        assert score == 30
+        assert score == 15
 
     async def test_damaged_body_above_market(self):
-        # 50 + (-10)*2 - 20 = 10
+        # damaged_body: hard cap at 15, then capped further by negative diff
         listing = _make_listing(price_diff_pct=-10.0, category="damaged_body")
+        score = await compute_deal_score(listing)
+        assert score == 15  # cap applies before negative diff adjustment
+
+    async def test_bad_docs_penalty(self):
+        # bad_docs: hard cap at 10
+        listing = _make_listing(category="bad_docs")
         score = await compute_deal_score(listing)
         assert score == 10
 
-    async def test_bad_docs_penalty(self):
-        # 50 - 30 = 20
-        listing = _make_listing(category="bad_docs")
-        score = await compute_deal_score(listing)
-        assert score == 20
-
     async def test_debtor_penalty(self):
-        # 50 - 25 = 25
+        # debtor: hard cap at 10
         listing = _make_listing(category="debtor")
         score = await compute_deal_score(listing)
-        assert score == 25
+        assert score == 10
 
     async def test_score_floor_is_zero(self):
         # 50 + (-30)*2 - 30 (bad_docs) = 50 - 60 - 30 = -40 → clamped to 0

@@ -36,19 +36,19 @@ async def compute_deal_score(listing: Listing) -> int:
     if listing.price_diff_pct:
         score += float(listing.price_diff_pct) * 2
 
-    # AI category bonus/penalty
+    # AI category — hard cap for problem listings
     if listing.analysis:
         category = listing.analysis.category
         if category == "clean":
             score += 10
         elif category == "damaged_body":
-            score -= 20
+            score = min(score, 15)  # hard cap: damaged cars are never "hot deals"
         elif category == "bad_docs":
-            score -= 30
+            score = min(score, 10)  # hard cap: legal problems = avoid
         elif category == "debtor":
-            score -= 25
+            score = min(score, 10)  # hard cap: debt = avoid
         elif category == "complex_but_profitable":
-            score += 5
+            score += 5  # risky but potentially good
 
     # Low mileage bonus / high mileage penalty
     if listing.mileage and listing.year:
@@ -83,6 +83,22 @@ async def compute_deal_score(listing: Listing) -> int:
             score += 5
         elif listing.owners_count >= 4:
             score -= 5
+
+    # Keyword-based red flags from description (catches problems even without AI analysis)
+    desc = (listing.description or "").lower()
+    red_flags = [
+        "на запчасти",
+        "под разбор",
+        "не на ходу",
+        "в залоге",
+        "запрет",
+        "не заводится",
+        "утеряны документы",
+        "без птс",
+        "конструктор",
+    ]
+    if any(flag in desc for flag in red_flags):
+        score = min(score, 15)
 
     # Clamp to 0-100
     return max(0, min(100, int(score)))

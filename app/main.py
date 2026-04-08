@@ -338,6 +338,7 @@ async def top_deals(limit: int = 20, min_score: int = 0):
                 Listing.is_duplicate.is_(False),
                 ListingAnalysis.score.isnot(None),
                 ListingAnalysis.score >= min_score,
+                ListingAnalysis.category.in_(["clean", "complex_but_profitable"]),
             )
             .order_by(desc(ListingAnalysis.score))
             .limit(limit)

@@ -14,6 +14,7 @@ HELP_TEXT = (
     "<b>Команды:</b>\n"
     "/filters — настроить фильтры (марка, модель, цена, скидка)\n"
     "/deals — топ-5 горячих предложений прямо сейчас\n"
+    "/drops — свежие снижения цен\n"
     "/stats — статистика уведомлений\n"
     "/stop — приостановить уведомления\n"
     "/help — эта справка"
@@ -84,6 +85,44 @@ async def cmd_deals(message: Message) -> None:
         url = deal.get("url", "")
         lines.append(f"{i}. <b>{brand} {model}</b> {year}")
         lines.append(f"   💰 {price:,.0f}₽  📉 {diff:+.0f}%")
+        if url:
+            lines.append(f"   🔗 {url}")
+        lines.append("")
+
+    await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
+
+
+@router.message(Command("drops"))
+async def cmd_drops(message: Message) -> None:
+    """Show recent price drops."""
+    try:
+        import httpx
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://localhost:8000/api/price-drops", timeout=10)
+            if resp.status_code != 200:
+                await message.answer("Сервер недоступен. Попробуй позже.")
+                return
+            data = resp.json()
+    except Exception:
+        await message.answer("Не удалось получить данные. Попробуй позже.")
+        return
+
+    drops = data if isinstance(data, list) else data.get("drops", [])
+    if not drops:
+        await message.answer("Нет свежих снижений цен.")
+        return
+
+    lines = ["📉 <b>Свежие снижения цен:</b>\n"]
+    for i, drop in enumerate(drops[:5], 1):
+        brand = drop.get("brand", "?")
+        model = drop.get("model", "?")
+        year = drop.get("year", "?")
+        price = drop.get("price", 0)
+        drop_pct = drop.get("price_drop_pct", 0)
+        url = drop.get("url", "")
+        lines.append(f"{i}. <b>{brand} {model}</b> {year}")
+        lines.append(f"   💰 {price:,.0f}₽  📉 Снижение: {drop_pct:.0f}%")
         if url:
             lines.append(f"   🔗 {url}")
         lines.append("")

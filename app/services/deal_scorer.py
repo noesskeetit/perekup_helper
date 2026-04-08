@@ -41,6 +41,12 @@ async def compute_deal_score(listing: Listing) -> int:
     if listing.price_diff_pct:
         diff = float(listing.price_diff_pct)
         capped_diff = max(-30, min(30, diff))
+        # Dampen for old cars — model over-predicts due to condition variance
+        car_age = CURRENT_YEAR - (listing.year or CURRENT_YEAR)
+        if car_age > 15:
+            capped_diff *= 0.5  # halve the bonus for very old cars
+        elif car_age > 10:
+            capped_diff *= 0.75  # reduce for older cars
         score += capped_diff * 1.5
 
     # AI category bonus (only additive ones here; hard caps applied below)

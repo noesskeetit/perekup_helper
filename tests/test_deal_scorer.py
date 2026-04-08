@@ -153,6 +153,35 @@ class TestLowScore:
         assert score == 20
 
 
+# ── Age dampening ──────────────────────────────────────────────────────────
+
+
+class TestAgeDampening:
+    """Old cars get dampened price_diff bonus due to condition variance."""
+
+    async def test_old_car_dampened(self):
+        # year 2005, age=21 → >15 → diff * 0.5
+        # 50 + (20 * 0.5 * 1.5) + 10 (clean) = 75
+        # mileage 300K/21yr = 14.3K → neutral range
+        listing = _make_listing(price_diff_pct=20.0, category="clean", year=2005, mileage=300_000)
+        score = await compute_deal_score(listing)
+        assert score == 75
+
+    async def test_medium_old_car_dampened(self):
+        # year 2014, age=12 → >10 → diff * 0.75
+        # 50 + (20 * 0.75 * 1.5) + 10 (clean) = 82
+        listing = _make_listing(price_diff_pct=20.0, category="clean", year=2014, mileage=150_000)
+        score = await compute_deal_score(listing)
+        assert score == 82
+
+    async def test_new_car_no_dampening(self):
+        # year 2020, age=6 → no dampening
+        # 50 + (20 * 1.5) + 10 (clean) = 90
+        listing = _make_listing(price_diff_pct=20.0, category="clean", year=2020, mileage=90_000)
+        score = await compute_deal_score(listing)
+        assert score == 90
+
+
 # ── Mileage bonus / penalty ─────────────────────────────────────────────────
 
 

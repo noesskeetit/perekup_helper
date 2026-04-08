@@ -14,6 +14,8 @@ def _make_listing(
     mileage: int | None = None,
     year: int | None = None,
     photo_count: int | None = None,
+    created_at=None,
+    owners_count: int | None = None,
 ) -> SimpleNamespace:
     """Build a lightweight listing stub for compute_deal_score().
 
@@ -30,6 +32,8 @@ def _make_listing(
         mileage=mileage,
         year=year,
         photo_count=photo_count,
+        created_at=created_at,
+        owners_count=owners_count,
     )
 
 

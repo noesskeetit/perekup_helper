@@ -15,8 +15,7 @@ import logging
 import sys
 import time
 
-from sqlalchemy import text, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 
 sys.path.insert(0, ".")
 
@@ -29,37 +28,39 @@ logger = logging.getLogger(__name__)
 
 
 def _create_avito_session():
-    """Create a curl_cffi session for fetching Avito detail pages."""
+    """Create an AviPars session with proper spfa.ru cookies.
+
+    AviPars handles: cookie purchase from spfa.ru API, Cloudflare bypass,
+    proxy configuration, and IP rotation. Raw curl_cffi without these
+    cookies gets 30KB truncated pages with no car specifications.
+    """
     import os
+    import threading
+    from pathlib import Path
 
-    from dotenv import load_dotenv
+    # Load .env
+    with open(".env") as f:
+        for line in f:
+            if "=" in line and not line.startswith("#"):
+                k, v = line.strip().split("=", 1)
+                os.environ.setdefault(k, v)
 
-    load_dotenv()
+    # Add avipars to path
+    avipars_dir = str(Path("avipars").resolve())
+    if avipars_dir not in sys.path:
+        sys.path.insert(0, avipars_dir)
 
-    try:
-        from curl_cffi import requests as cffi_requests
-    except ImportError:
-        logger.error("curl_cffi required. Install: pip install curl_cffi")
-        sys.exit(1)
+    from load_config import load_avito_config
+    from parser_cls import AvitoParse
 
-    proxy_raw = os.getenv("PROXY_STRING", "")
-    proxy_type = os.getenv("PROXY_TYPE", "socks5")
-    if proxy_raw and "://" not in proxy_raw:
-        proxy = f"{proxy_type}://{proxy_raw}"
-    else:
-        proxy = proxy_raw or None
-    proxies = {"http": proxy, "https": proxy} if proxy else None
-    logger.info("Using proxy: %s", proxy_type if proxy else "none")
+    config = load_avito_config("avipars/config.toml")
+    config.one_time_start = True
+    config.save_xlsx = False
 
-    session = cffi_requests.Session(impersonate="chrome", proxies=proxies)
-    # Warm up cookies
-    try:
-        resp = session.get("https://www.avito.ru/", timeout=20)
-        logger.info("Cookie warmup: status=%d, size=%d", resp.status_code, len(resp.text))
-    except Exception as e:
-        logger.warning("Cookie warmup failed: %s", e)
-
-    return session
+    stop_event = threading.Event()
+    parser = AvitoParse(config, stop_event=stop_event)
+    logger.info("AviPars session created with spfa.ru cookies")
+    return parser
 
 
 async def get_unenriched_listings(limit: int) -> list[dict]:
@@ -127,17 +128,12 @@ async def update_listing(listing_id: str, updates: dict) -> bool:
         return True
 
 
-def fetch_and_enrich(session, url: str, listing_dict: dict) -> dict | None:
-    """Fetch detail page and extract enrichment data."""
+def fetch_and_enrich(avipars_session, url: str, listing_dict: dict) -> dict | None:
+    """Fetch detail page via AviPars (with spfa.ru cookies) and extract enrichment data."""
     try:
-        resp = session.get(url, timeout=30)
-        if resp.status_code != 200:
-            logger.debug("HTTP %d for %s", resp.status_code, url)
-            return None
-
-        html = resp.text
-        if len(html) < 5000:
-            logger.debug("Response too small (%d bytes) for %s", len(html), url)
+        html = avipars_session.fetch_data(url=url)
+        if not html or len(html) < 5000:
+            logger.debug("Bad response (%d bytes) for %s", len(html) if html else 0, url)
             return None
 
         # Create a temporary ParsedListing to enrich

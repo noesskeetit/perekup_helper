@@ -605,6 +605,25 @@ async def search_listings(
     ]
 
 
+@app.get("/api/brands")
+async def list_brands():
+    """List all brands with listing counts, sorted by count."""
+    from sqlalchemy import func, select
+
+    from app.db.session import async_session_factory
+    from app.models.listing import Listing
+
+    async with async_session_factory() as session:
+        stmt = (
+            select(Listing.brand, func.count(Listing.id).label("count"))
+            .where(Listing.is_duplicate.is_(False))
+            .group_by(Listing.brand)
+            .order_by(func.count(Listing.id).desc())
+        )
+        result = await session.execute(stmt)
+        return [{"brand": row[0], "count": row[1]} for row in result.all()]
+
+
 @app.get("/api/model-info")
 async def model_info():
     """Get current price model metadata."""

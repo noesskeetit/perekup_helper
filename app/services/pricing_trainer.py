@@ -137,11 +137,23 @@ async def train_model() -> dict:
 
     df = pd.concat(mad_clean_parts, ignore_index=True)
 
+    # 4. Cross-source price sanity filter.
+    #    Auto.ru sometimes captures monthly payments or down payments as prices.
+    #    Remove listings whose price is <30% of the (brand, model) median across all sources.
+    cross_source_removed = 0
+    if len(df) > 100:
+        median_prices = df.groupby(["brand", "model"])["price"].transform("median")
+        # Flag listings with price < 30% of segment median (likely payment amounts, not prices)
+        suspicious = df["price"] < (median_prices * 0.3)
+        cross_source_removed = int(suspicious.sum())
+        df = df[~suspicious].copy()
+
     logger.info(
-        "Removed %d stale, %d IQR outliers, %d MAD outliers from %d total (kept %d)",
+        "Removed %d stale, %d IQR outliers, %d MAD outliers, %d cross-source suspicious from %d total (kept %d)",
         stale_count,
         outlier_count,
         mad_outlier_count,
+        cross_source_removed,
         total,
         len(df),
     )

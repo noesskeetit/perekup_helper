@@ -631,6 +631,8 @@ async def search_listings(
     price_to: int | None = None,
     min_discount: float | None = None,
     source: str | None = None,
+    city: str | None = None,
+    min_score: int | None = None,
     limit: int = 20,
     session: AsyncSession = Depends(get_session),
 ):
@@ -657,6 +659,10 @@ async def search_listings(
         stmt = stmt.where(Listing.price_diff_pct >= min_discount)
     if source:
         stmt = stmt.where(Listing.source == source.lower())
+    if city:
+        stmt = stmt.where(func.lower(Listing.city).contains(city.lower()))
+    if min_score:
+        stmt = stmt.where(Listing.deal_score >= min_score)
 
     stmt = stmt.order_by(Listing.deal_score.desc().nullslast(), Listing.created_at.desc()).limit(min(limit, 50))
 
@@ -676,6 +682,8 @@ async def search_listings(
             "city": listing.city,
             "source": listing.source,
             "url": listing.url,
+            "body_type": listing.body_type,
+            "owners_count": listing.owners_count,
         }
         for listing in listings
     ]

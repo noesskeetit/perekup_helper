@@ -45,15 +45,51 @@ async def train_model(*, exclude_sources: list[str] | None = None) -> dict:
     Returns training stats dict.
     """
     async with async_session_factory() as session:
-        stmt = select(Listing).where(
-            Listing.price > 0,
-            Listing.is_duplicate.is_(False),
+        from sqlalchemy.orm import selectinload
+
+        stmt = (
+            select(Listing)
+            .options(selectinload(Listing.analysis))
+            .where(
+                Listing.price > 0,
+                Listing.is_duplicate.is_(False),
+            )
         )
         if exclude_sources:
             for src in exclude_sources:
                 stmt = stmt.where(Listing.source != src)
         result = await session.execute(stmt)
-        listings = list(result.scalars().all())
+        all_listings = list(result.scalars().unique().all())
+
+    # Filter out problem listings that distort the price model.
+    # "Cheap because damaged" ≠ "cheap because underpriced"
+    problem_categories = {"damaged_body", "bad_docs", "debtor"}
+    red_flag_keywords = [
+        "на запчасти",
+        "под разбор",
+        "не на ходу",
+        "в залоге",
+        "не заводится",
+        "утеряны документы",
+        "без птс",
+        "конструктор",
+    ]
+
+    listings = []
+    filtered_count = 0
+    for row in all_listings:
+        # Filter by AI category
+        if row.analysis and row.analysis.category in problem_categories:
+            filtered_count += 1
+            continue
+        # Filter by description red flags
+        desc = (row.description or "").lower()
+        if any(flag in desc for flag in red_flag_keywords):
+            filtered_count += 1
+            continue
+        listings.append(row)
+
+    logger.info("Filtered %d problem listings from training (%d remaining)", filtered_count, len(listings))
 
     if not listings:
         logger.warning("No listings in DB for training")

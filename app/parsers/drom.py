@@ -89,6 +89,33 @@ DEFAULT_URLS = [
     # Nizhny Novgorod
     "https://nn.drom.ru/toyota/?minprice=100000&maxprice=1500000",
     "https://nn.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    # Additional Moscow — LADA, Renault, Ford (popular budget brands)
+    "https://moscow.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    "https://moscow.drom.ru/renault/?minprice=100000&maxprice=1500000",
+    "https://moscow.drom.ru/ford/?minprice=100000&maxprice=1500000",
+    # Additional SPb — more brands
+    "https://spb.drom.ru/bmw/?minprice=200000&maxprice=2000000",
+    "https://spb.drom.ru/nissan/?minprice=100000&maxprice=1500000",
+    "https://spb.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    "https://spb.drom.ru/renault/?minprice=100000&maxprice=1500000",
+    # Additional Krasnodar
+    "https://krasnodar.drom.ru/bmw/?minprice=200000&maxprice=2000000",
+    "https://krasnodar.drom.ru/nissan/?minprice=100000&maxprice=1500000",
+    "https://krasnodar.drom.ru/renault/?minprice=100000&maxprice=1500000",
+    "https://krasnodar.drom.ru/volkswagen/?minprice=100000&maxprice=1500000",
+    # Additional Ekaterinburg
+    "https://ekaterinburg.drom.ru/hyundai/?minprice=100000&maxprice=1500000",
+    "https://ekaterinburg.drom.ru/nissan/?minprice=100000&maxprice=1500000",
+    # Additional Novosibirsk
+    "https://novosibirsk.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    "https://novosibirsk.drom.ru/kia/?minprice=100000&maxprice=1500000",
+    # Voronezh (new city)
+    "https://voronezh.drom.ru/toyota/?minprice=100000&maxprice=1500000",
+    "https://voronezh.drom.ru/lada/?minprice=100000&maxprice=1000000",
+    "https://voronezh.drom.ru/hyundai/?minprice=100000&maxprice=1500000",
+    # Chelyabinsk (new city)
+    "https://chelyabinsk.drom.ru/toyota/?minprice=100000&maxprice=1500000",
+    "https://chelyabinsk.drom.ru/lada/?minprice=100000&maxprice=1000000",
 ]
 
 
@@ -106,8 +133,8 @@ class DromParser(BaseParser):
     def __init__(
         self,
         urls: list[str] | None = None,
-        pages_per_url: int = 3,
-        max_cards_per_url: int = 30,
+        pages_per_url: int = 5,
+        max_cards_per_url: int = 50,
         listing_pause: float = 1.0,
         card_pause_range: tuple[float, float] = (0.3, 0.8),
         concurrency: int = 5,

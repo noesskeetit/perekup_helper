@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import engine
+from app.db.session import engine, get_session
 from app.models.base import Base
 from app.routes.listings import router as listings_router
 from app.routes.stats import router as stats_router
@@ -555,37 +556,36 @@ async def search_listings(
     min_discount: float | None = None,
     source: str | None = None,
     limit: int = 20,
+    session: AsyncSession = Depends(get_session),
 ):
     """Search listings with filters. Returns top results by deal_score."""
     from sqlalchemy import func, select
 
-    from app.db.session import async_session_factory
     from app.models.listing import Listing
 
-    async with async_session_factory() as session:
-        stmt = select(Listing).where(Listing.is_duplicate.is_(False), Listing.price > 0)
+    stmt = select(Listing).where(Listing.is_duplicate.is_(False), Listing.price > 0)
 
-        if brand:
-            stmt = stmt.where(func.lower(Listing.brand) == brand.lower())
-        if model:
-            stmt = stmt.where(func.lower(Listing.model) == model.lower())
-        if year_from:
-            stmt = stmt.where(Listing.year >= year_from)
-        if year_to:
-            stmt = stmt.where(Listing.year <= year_to)
-        if price_from:
-            stmt = stmt.where(Listing.price >= price_from)
-        if price_to:
-            stmt = stmt.where(Listing.price <= price_to)
-        if min_discount:
-            stmt = stmt.where(Listing.price_diff_pct >= min_discount)
-        if source:
-            stmt = stmt.where(Listing.source == source.lower())
+    if brand:
+        stmt = stmt.where(func.lower(Listing.brand) == brand.lower())
+    if model:
+        stmt = stmt.where(func.lower(Listing.model) == model.lower())
+    if year_from:
+        stmt = stmt.where(Listing.year >= year_from)
+    if year_to:
+        stmt = stmt.where(Listing.year <= year_to)
+    if price_from:
+        stmt = stmt.where(Listing.price >= price_from)
+    if price_to:
+        stmt = stmt.where(Listing.price <= price_to)
+    if min_discount:
+        stmt = stmt.where(Listing.price_diff_pct >= min_discount)
+    if source:
+        stmt = stmt.where(Listing.source == source.lower())
 
-        stmt = stmt.order_by(Listing.deal_score.desc().nullslast(), Listing.created_at.desc()).limit(min(limit, 50))
+    stmt = stmt.order_by(Listing.deal_score.desc().nullslast(), Listing.created_at.desc()).limit(min(limit, 50))
 
-        result = await session.execute(stmt)
-        listings = result.scalars().all()
+    result = await session.execute(stmt)
+    listings = result.scalars().all()
 
     return [
         {
@@ -606,22 +606,20 @@ async def search_listings(
 
 
 @app.get("/api/brands")
-async def list_brands():
+async def list_brands(session: AsyncSession = Depends(get_session)):
     """List all brands with listing counts, sorted by count."""
     from sqlalchemy import func, select
 
-    from app.db.session import async_session_factory
     from app.models.listing import Listing
 
-    async with async_session_factory() as session:
-        stmt = (
-            select(Listing.brand, func.count(Listing.id).label("count"))
-            .where(Listing.is_duplicate.is_(False))
-            .group_by(Listing.brand)
-            .order_by(func.count(Listing.id).desc())
-        )
-        result = await session.execute(stmt)
-        return [{"brand": row[0], "count": row[1]} for row in result.all()]
+    stmt = (
+        select(Listing.brand, func.count(Listing.id).label("count"))
+        .where(Listing.is_duplicate.is_(False))
+        .group_by(Listing.brand)
+        .order_by(func.count(Listing.id).desc())
+    )
+    result = await session.execute(stmt)
+    return [{"brand": row[0], "count": row[1]} for row in result.all()]
 
 
 @app.get("/api/model-info")

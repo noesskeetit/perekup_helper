@@ -275,3 +275,62 @@ async def test_model_health_widget_structure(async_client):
     html = resp.text
     # The widget should have model-health class and health badge
     assert "model-health" in html or "health-badge" in html or "MAPE" in html
+
+
+# ---------------------------------------------------------------------------
+# API endpoints
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_api_search_no_params(async_client):
+    """Search with no params returns a list."""
+    resp = await async_client.get("/api/search")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+
+
+@pytest.mark.asyncio
+async def test_api_search_by_brand(async_client):
+    """Search by brand returns matching results."""
+    resp = await async_client.get("/api/search?brand=Toyota")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    for item in data:
+        assert item["brand"].lower() == "toyota"
+        assert "price" in item
+        assert "url" in item
+
+
+@pytest.mark.asyncio
+async def test_api_search_limit(async_client):
+    """Search limit parameter works."""
+    resp = await async_client.get("/api/search?limit=2")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) <= 2
+
+
+@pytest.mark.asyncio
+async def test_api_brands(async_client):
+    """Brands endpoint returns brand list with counts."""
+    resp = await async_client.get("/api/brands")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    if data:
+        assert "brand" in data[0]
+        assert "count" in data[0]
+
+
+@pytest.mark.asyncio
+async def test_api_health_detailed(async_client):
+    """Health check returns detailed status."""
+    resp = await async_client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "status" in data
+    assert "db" in data
+    assert "model" in data

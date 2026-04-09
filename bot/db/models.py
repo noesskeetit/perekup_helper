@@ -25,6 +25,9 @@ class Filter(Base):
     model: Mapped[str | None] = mapped_column(String, nullable=True)
     max_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     min_discount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    city: Mapped[str | None] = mapped_column(String, nullable=True)
+    min_year: Mapped[int | None] = mapped_column(nullable=True)
+    min_deal_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
 
 

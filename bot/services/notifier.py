@@ -39,7 +39,15 @@ def _matches(listing: Listing, f: Filter) -> bool:
         return False
     if f.max_price is not None and listing.price > f.max_price:
         return False
-    return not (f.min_discount is not None and listing.discount_pct < f.min_discount)
+    if f.min_discount is not None and listing.discount_pct < f.min_discount:
+        return False
+    if f.city and listing.city and f.city.lower() not in listing.city.lower():
+        return False
+    if f.min_year is not None and listing.year < f.min_year:
+        return False
+    return not (
+        f.min_deal_score is not None and (listing.deal_score is None or listing.deal_score < f.min_deal_score)
+    )
 
 
 def _format_message(listing: Listing) -> str:

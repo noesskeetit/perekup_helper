@@ -21,6 +21,9 @@ class FilterSetup(StatesGroup):
     model = State()
     max_price = State()
     min_discount = State()
+    city = State()
+    min_year = State()
+    min_deal_score = State()
     confirm = State()
 
 
@@ -48,6 +51,12 @@ async def cmd_filters(message: Message, state: FSMContext) -> None:
                 parts.append(f"макс. цена: {f.max_price:,.0f}")
             if f.min_discount is not None:
                 parts.append(f"мин. дисконт: {f.min_discount}%")
+            if f.city:
+                parts.append(f"город: {f.city}")
+            if f.min_year is not None:
+                parts.append(f"от {f.min_year} г.")
+            if f.min_deal_score is not None:
+                parts.append(f"оценка >= {f.min_deal_score}")
             lines.append(f"{i}. {', '.join(parts) if parts else 'без ограничений'}")
         text = "\n".join(lines)
     else:
@@ -124,6 +133,52 @@ async def process_min_discount(message: Message, state: FSMContext) -> None:
             await message.answer("Некорректный дисконт. Введи число от 0 до 100 или «-».")
             return
 
+    await state.set_state(FilterSetup.city)
+    await message.answer("Введи город (например: Москва).\nОтправь «-» чтобы пропустить.")
+
+
+@router.message(FilterSetup.city)
+async def process_city(message: Message, state: FSMContext) -> None:
+    value = message.text.strip()
+    await state.update_data(city=None if value == "-" else value)
+    await state.set_state(FilterSetup.min_year)
+    await message.answer("Введи минимальный год выпуска (например: 2018).\nОтправь «-» чтобы пропустить.")
+
+
+@router.message(FilterSetup.min_year)
+async def process_min_year(message: Message, state: FSMContext) -> None:
+    value = message.text.strip()
+    if value == "-":
+        await state.update_data(min_year=None)
+    else:
+        try:
+            year = int(value)
+            if year < 1990 or year > 2030:
+                raise ValueError
+            await state.update_data(min_year=year)
+        except ValueError:
+            await message.answer("Некорректный год. Введи число от 1990 до 2030 или «-».")
+            return
+
+    await state.set_state(FilterSetup.min_deal_score)
+    await message.answer("Введи минимальную оценку сделки 0-100 (рекомендую 60+).\nОтправь «-» чтобы пропустить.")
+
+
+@router.message(FilterSetup.min_deal_score)
+async def process_min_deal_score(message: Message, state: FSMContext) -> None:
+    value = message.text.strip()
+    if value == "-":
+        await state.update_data(min_deal_score=None)
+    else:
+        try:
+            score = float(value)
+            if score < 0 or score > 100:
+                raise ValueError
+            await state.update_data(min_deal_score=score)
+        except ValueError:
+            await message.answer("Некорректная оценка. Введи число от 0 до 100 или «-».")
+            return
+
     data = await state.get_data()
     await state.set_state(FilterSetup.confirm)
 
@@ -136,6 +191,12 @@ async def process_min_discount(message: Message, state: FSMContext) -> None:
         summary_parts.append(f"Макс. цена: {data['max_price']:,.0f}")
     if data.get("min_discount") is not None:
         summary_parts.append(f"Мин. дисконт: {data['min_discount']}%")
+    if data.get("city"):
+        summary_parts.append(f"Город: {data['city']}")
+    if data.get("min_year") is not None:
+        summary_parts.append(f"Мин. год: {data['min_year']}")
+    if data.get("min_deal_score") is not None:
+        summary_parts.append(f"Мин. оценка: {data['min_deal_score']}")
 
     summary = "\n".join(summary_parts) if summary_parts else "Без ограничений (все объявления)"
 
@@ -162,6 +223,9 @@ async def cb_filter_save(callback: CallbackQuery, state: FSMContext) -> None:
             model=data.get("model"),
             max_price=data.get("max_price"),
             min_discount=data.get("min_discount"),
+            city=data.get("city"),
+            min_year=data.get("min_year"),
+            min_deal_score=data.get("min_deal_score"),
         )
         session.add(new_filter)
         await session.commit()

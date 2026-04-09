@@ -16,5 +16,5 @@ venv/
 logs/
 storage/
 catboost_info/
-models/
+/models/
 mlruns/

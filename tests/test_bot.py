@@ -257,7 +257,22 @@ class TestListingDataclass:
 
     def test_required_fields_present(self):
         fields = {f.name for f in dataclasses.fields(Listing)}
-        expected = {"brand", "model", "year", "price", "market_price", "discount_pct", "category", "url", "photo_url", "deal_score", "mileage", "city", "source", "listing_id"}
+        expected = {
+            "brand",
+            "model",
+            "year",
+            "price",
+            "market_price",
+            "discount_pct",
+            "category",
+            "url",
+            "photo_url",
+            "deal_score",
+            "mileage",
+            "city",
+            "source",
+            "listing_id",
+        }
         assert expected == fields
 
     def test_field_types(self):

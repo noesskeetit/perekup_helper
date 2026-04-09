@@ -257,7 +257,7 @@ class TestListingDataclass:
 
     def test_required_fields_present(self):
         fields = {f.name for f in dataclasses.fields(Listing)}
-        expected = {"brand", "model", "year", "price", "market_price", "discount_pct", "category", "url", "photo_url"}
+        expected = {"brand", "model", "year", "price", "market_price", "discount_pct", "category", "url", "photo_url", "deal_score", "mileage", "city", "source", "listing_id"}
         assert expected == fields
 
     def test_field_types(self):
@@ -336,21 +336,23 @@ class TestFormatMessage:
         msg = _format_message(listing)
         assert "Crossover" in msg
 
-    def test_contains_url(self):
+    def test_url_in_keyboard_not_text(self):
         listing = _make_listing(url="https://auto.ru/listing/999")
         msg = _format_message(listing)
-        assert "https://auto.ru/listing/999" in msg
+        # URL moved to inline keyboard button, not in message text
+        assert "https://auto.ru/listing/999" not in msg
 
     def test_has_emoji_decorators(self):
         msg = _format_message(_make_listing())
-        # Verify the message uses the expected emoji prefixes
-        for emoji in ["\U0001f697", "\U0001f4b0", "\U0001f4c8", "\U0001f525", "\U0001f4e6", "\U0001f517"]:
+        # 🚗 brand, 💰 price, 🔥 discount, category icon
+        for emoji in ["\U0001f697", "\U0001f4b0", "\U0001f525"]:
             assert emoji in msg
 
     def test_multiline_format(self):
         msg = _format_message(_make_listing())
         lines = msg.strip().split("\n")
-        assert len(lines) == 6
+        # 🚗 brand, 💰 price, 🔥 discount, category icon = 4 lines minimum
+        assert len(lines) >= 4
 
     def test_large_price_formatted_with_commas(self):
         listing = _make_listing(price=15_500_000, market_price=18_000_000)

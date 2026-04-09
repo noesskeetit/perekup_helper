@@ -36,9 +36,6 @@ class Listing(Base):
     __tablename__ = "listings"
     __table_args__ = (
         UniqueConstraint("source", "external_id", name="uq_source_external_id"),
-        Index("ix_listings_not_dup_diff", "is_duplicate", "price_diff_pct"),
-        Index("ix_listings_deal_score", "is_duplicate", "deal_score"),
-        Index("ix_listings_created", "is_duplicate", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)

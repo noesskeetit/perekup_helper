@@ -154,12 +154,10 @@ class DromParser(BaseParser):
         all_listings: list[ParsedListing] = []
         seen_ids: set[str] = set()
 
-        proxy_url = self._get_proxy_url()
         headers = {**HEADERS, "User-Agent": random.choice(USER_AGENTS)}
-        client_kwargs = {"headers": headers, "timeout": 40, "follow_redirects": True}
-        if proxy_url:
-            client_kwargs["proxy"] = proxy_url
-            logger.info("Drom: using proxy %s", proxy_url.split("@")[-1] if "@" in proxy_url else "configured")
+        # Drom doesn't use Cloudflare — direct connection is more reliable than proxy.
+        # Proxy caused frequent timeouts on SPB, Krasnodar, Ekaterinburg.
+        client_kwargs = {"headers": headers, "timeout": 60, "follow_redirects": True}
 
         async with httpx.AsyncClient(**client_kwargs) as client:
             # Phase 1: collect ALL card URLs from all listing pages (concurrent)

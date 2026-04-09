@@ -256,6 +256,82 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeModal();
 });
 document.addEventListener('DOMContentLoaded', restoreFilters);
+document.addEventListener('DOMContentLoaded', initFavorites);
+
+/* ── Favorites (localStorage) ────────────────────────────────────── */
+var FAV_KEY = 'perekup_favorites';
+
+function getFavs() {
+    try { return JSON.parse(localStorage.getItem(FAV_KEY) || '{}'); } catch(e) { return {}; }
+}
+
+function saveFavs(favs) {
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(favs)); } catch(e) {}
+    updateFavCounter();
+}
+
+function toggleFav(id, brand, model, year, price, url) {
+    var favs = getFavs();
+    if (favs[id]) {
+        delete favs[id];
+    } else {
+        favs[id] = {brand: brand, model: model, year: year, price: price, url: url, saved_at: new Date().toISOString()};
+    }
+    saveFavs(favs);
+    renderFavStars();
+}
+
+function renderFavStars() {
+    var favs = getFavs();
+    document.querySelectorAll('.fav-star').forEach(function(el) {
+        var id = el.id.replace('fav-', '');
+        el.innerHTML = favs[id] ? '&#9733;' : '&#9734;';
+        el.classList.toggle('fav-active', !!favs[id]);
+    });
+}
+
+function updateFavCounter() {
+    var favs = getFavs();
+    var count = Object.keys(favs).length;
+    var counter = document.getElementById('fav-counter');
+    if (counter) {
+        counter.textContent = count > 0 ? count : '';
+        counter.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+}
+
+function initFavorites() {
+    renderFavStars();
+    updateFavCounter();
+}
+
+function showFavorites() {
+    var favs = getFavs();
+    var ids = Object.keys(favs);
+    if (ids.length === 0) {
+        alert('Нет сохранённых объявлений. Нажми звёздочку чтобы добавить.');
+        return;
+    }
+    var html = '<div class="modal-header"><h2>&#9733; Избранное (' + ids.length + ')</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>';
+    html += '<div class="fav-list">';
+    ids.sort(function(a, b) { return (favs[b].saved_at || '').localeCompare(favs[a].saved_at || ''); });
+    ids.forEach(function(id) {
+        var f = favs[id];
+        html += '<div class="fav-item">';
+        html += '<div class="fav-info">';
+        html += '<strong>' + f.brand + ' ' + f.model + '</strong> ' + f.year;
+        html += '<br><span class="fav-price">' + Number(f.price).toLocaleString('ru-RU') + ' &#8381;</span>';
+        html += '</div>';
+        html += '<div class="fav-actions">';
+        html += '<a href="' + f.url + '" target="_blank" class="btn btn-small">Открыть</a> ';
+        html += '<button class="btn btn-small btn-secondary" onclick="openDetail(\'' + id + '\')">Детали</button> ';
+        html += '<button class="btn btn-small btn-danger" onclick="toggleFav(\'' + id + '\',\'\',\'\',0,0,\'\'); showFavorites();">Удалить</button>';
+        html += '</div></div>';
+    });
+    html += '</div>';
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('detail-modal').style.display = 'flex';
+}
 
 var VIEW_STORAGE_KEY = 'perekup_view';
 
@@ -294,6 +370,7 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
         var saved = 'list';
         try { saved = localStorage.getItem(VIEW_STORAGE_KEY) || 'list'; } catch(e) {}
         applyView(saved);
+        renderFavStars();
     }
 });
 

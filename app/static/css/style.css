@@ -1276,3 +1276,27 @@ body.theme-transitioning *::after {
     .container { padding: 0 12px; }
     header { margin-bottom: 16px; }
 }
+
+/* ── Favorites ──────────────────────────────────────────────────── */
+.fav-col { width: 36px; text-align: center; }
+.fav-cell { text-align: center; cursor: pointer; }
+.fav-star { font-size: 1.2rem; color: var(--text-muted); transition: color 0.2s; }
+.fav-star:hover { color: var(--primary); }
+.fav-star.fav-active { color: #f59e0b; }
+.fav-counter-badge {
+    background: #f59e0b; color: #fff; font-size: 0.7rem;
+    padding: 1px 6px; border-radius: 10px; margin-left: 2px; vertical-align: super;
+}
+.nav-fav { font-size: 1.1rem; }
+
+.fav-list { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.fav-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-radius: 8px;
+    background: var(--surface-bg); border: 1px solid var(--border-color);
+}
+.fav-info strong { font-size: 1rem; }
+.fav-price { color: var(--primary); font-weight: 600; }
+.fav-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-small { padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; }
+.btn-danger { background: var(--bad); color: #fff; border: none; cursor: pointer; }

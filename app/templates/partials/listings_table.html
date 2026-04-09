@@ -22,6 +22,7 @@
             {{ sort_header("deal_score", "Скор") }}
             {{ sort_header("age", "Возраст") }}
             <th>Источник</th>
+            <th class="fav-col"></th>
         </tr>
     </thead>
     <tbody>
@@ -110,6 +111,9 @@
                     {{ listing.source }}
                 </a>
             </td>
+            <td class="fav-cell" onclick="event.stopPropagation(); toggleFav('{{ listing.id }}', '{{ listing.brand }}', '{{ listing.model }}', {{ listing.year }}, {{ listing.price }}, '{{ listing.url }}')">
+                <span class="fav-star" id="fav-{{ listing.id }}">&#9734;</span>
+            </td>
         </tr>
         {% else %}
         <tr>
@@ -157,6 +161,7 @@
                     {{ categories.get(analysis.category, analysis.category) }}
                 </span>
                 {% endif %}
+                <span class="fav-star card-fav" id="fav-{{ listing.id }}" onclick="event.stopPropagation(); toggleFav('{{ listing.id }}', '{{ listing.brand }}', '{{ listing.model }}', {{ listing.year }}, {{ listing.price }}, '{{ listing.url }}')">&#9734;</span>
             </div>
         </div>
     </div>

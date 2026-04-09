@@ -221,6 +221,7 @@ async def main():
 
     enriched = 0
     failed = 0
+    consecutive_fails = 0
     total_fields = 0
     t0 = time.time()
 
@@ -229,6 +230,7 @@ async def main():
 
         if updates:
             enriched += 1
+            consecutive_fails = 0
             total_fields += len(updates)
             fields_str = ", ".join(f"{k}={v}" for k, v in list(updates.items())[:5])
 
@@ -260,6 +262,26 @@ async def main():
                     failed += 1
         else:
             failed += 1
+            consecutive_fails += 1
+
+            # Auto-rotate IP after 5 consecutive failures (likely rate-limited)
+            if consecutive_fails >= 5:
+                logger.warning("5 consecutive failures — rotating proxy IP...")
+                try:
+                    from app.parsers.proxy_manager import change_ip
+
+                    new_ip = change_ip()
+                    if new_ip:
+                        logger.info("IP rotated to %s, waiting 10s...", new_ip)
+                        time.sleep(10)
+                        consecutive_fails = 0
+                    else:
+                        logger.warning("IP rotation failed, waiting 30s...")
+                        time.sleep(30)
+                except Exception:
+                    logger.warning("IP rotation error, waiting 30s...")
+                    time.sleep(30)
+
             if (i + 1) % 50 == 0:
                 logger.info("[%d/%d] Progress: enriched=%d, failed=%d", i + 1, len(listings), enriched, failed)
 

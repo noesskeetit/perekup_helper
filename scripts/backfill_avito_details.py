@@ -264,16 +264,28 @@ async def main():
             failed += 1
             consecutive_fails += 1
 
-            # Auto-rotate IP after 5 consecutive failures (likely rate-limited)
+            # After 5 consecutive failures: buy FRESH cookies + rotate IP
+            # The root cause of persistent 429s is stale cookies, not just IP.
+            # AviPars default behavior tries to "unblock" old cookies which rarely works.
             if consecutive_fails >= 5:
-                logger.warning("5 consecutive failures — rotating proxy IP...")
+                logger.warning("5 consecutive failures — buying fresh cookies + rotating IP...")
+                try:
+                    # Force-buy new cookies from spfa.ru (bypass unblock logic)
+                    cookie_provider = getattr(session.http, "cookies", None)
+                    if cookie_provider and hasattr(cookie_provider, "_get_new_cookies"):
+                        logger.info("Purchasing fresh cookies from spfa.ru...")
+                        cookie_provider._get_new_cookies()
+                        logger.info("Fresh cookies purchased (id=%s)", cookie_provider.last_id)
+                except Exception as e:
+                    logger.warning("Cookie purchase failed: %s", e)
+
                 try:
                     from app.parsers.proxy_manager import change_ip
 
                     new_ip = change_ip()
                     if new_ip:
-                        logger.info("IP rotated to %s, waiting 10s...", new_ip)
-                        time.sleep(10)
+                        logger.info("IP rotated to %s, waiting 15s for cooldown...", new_ip)
+                        time.sleep(15)
                         consecutive_fails = 0
                     else:
                         logger.warning("IP rotation failed, waiting 30s...")

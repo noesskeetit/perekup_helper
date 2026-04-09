@@ -65,6 +65,8 @@ async def compute_deal_score(listing: Listing) -> int:
             score += 5
         elif mileage_per_year > 30000:
             score -= 5
+        elif mileage_per_year > 50000:
+            score -= 10
 
     # Has photos bonus (transparent seller) — check higher threshold first
     if listing.photo_count and listing.photo_count > 10:
@@ -129,6 +131,18 @@ async def compute_deal_score(listing: Listing) -> int:
             score = min(score, 15)
         elif category in ("bad_docs", "debtor"):
             score = min(score, 10)
+
+    # High mileage hard cap — 300K+ km cars are worn out, not deals
+    if listing.mileage and listing.mileage >= 300_000:
+        score = min(score, 30)
+    elif listing.mileage and listing.mileage >= 200_000:
+        score = min(score, 55)
+
+    # Mileage vs age sanity — if mileage is impossibly high for the age, data is suspect
+    if listing.mileage and listing.year:
+        car_age = max(1, CURRENT_YEAR - listing.year)
+        if listing.mileage / car_age > 50_000:
+            score = min(score, 40)
 
     # Keyword red flags from description
     desc = (listing.description or "").lower()

@@ -26,7 +26,6 @@ MAPE optimization notes (v4 — stacking + native text features):
 from __future__ import annotations
 
 import logging
-import math
 import pickle
 from datetime import UTC, datetime
 from pathlib import Path
@@ -178,6 +177,8 @@ class PriceModel:
         self._te_stats: dict[str, dict[str, float]] = {}  # target encoding lookup tables
         self._global_log_mean: float = 0.0
         self._has_text: bool = False
+        self._cat_encoders: dict[str, dict[str, int]] = {}  # saved category→code maps for LGB
+        self._sample_counts: dict[str, int] = {}  # brand_model → sample count for confidence
         self._trained_at: datetime | None = None
         self._training_size: int = 0
         self._feature_names: list[str] = ALL_FEATURES
@@ -236,10 +237,11 @@ class PriceModel:
 
         stats = {"status": "trained", "samples": len(df), "quantile_metrics": {}}
 
-        # --- Compute target encoding stats (for stacking) ---
         log_prices = np.log(y.values)
-        self._global_log_mean = float(np.mean(log_prices))
-        self._te_stats = self._compute_te_stats(df, log_prices)
+
+        # Save sample counts per brand+model for prediction confidence
+        bm_key = df["brand"].astype(str) + "_" + df["model"].astype(str)
+        self._sample_counts = bm_key.value_counts().to_dict()
 
         # Prepare Pool kwargs for text features
         text_pool_kwargs = {}
@@ -304,11 +306,22 @@ class PriceModel:
                 "mape": round(mape, 1),
             }
 
-        # --- Train LightGBM for P50 stacking ---
+        # --- Compute TE stats on TRAIN fold only (prevents leakage into val) ---
+        train_log_prices = log_prices[:split_idx]
+        train_te_stats = self._compute_te_stats(df.iloc[:split_idx], train_log_prices)
+        train_global_mean = float(np.mean(train_log_prices))
+
+        # --- Train LightGBM for P50 stacking (using train-only TE stats) ---
+        self._te_stats = train_te_stats
+        self._global_log_mean = train_global_mean
         self._train_lgb_model(df, log_prices, weights, split_idx, stats)
 
-        # --- Train CatBoost+TE for P50 stacking ---
+        # --- Train CatBoost+TE for P50 stacking (using train-only TE stats) ---
         self._train_cb_te_model(df, log_prices, weights, cat_feature_indices, split_idx, stats)
+
+        # --- Recompute TE stats on FULL data for production inference ---
+        self._global_log_mean = float(np.mean(log_prices))
+        self._te_stats = self._compute_te_stats(df, log_prices)
 
         # --- 5-fold CV MAPE for P50 stacking (reliable metric) ---
         cv_mape = self._cross_validate_mape(X, y, weights, cat_feature_indices, n_folds=5)
@@ -433,8 +446,12 @@ class PriceModel:
         df_te = self._apply_te_features(df)
 
         # LightGBM features: label-encoded categoricals + numerics + TE features
+        # Save category→code mappings so we reuse them at inference time
+        self._cat_encoders = {}
         for col in CAT_FEATURES:
-            df_te[f"{col}_code"] = df_te[col].astype("category").cat.codes
+            cat_series = df_te[col].astype("category")
+            self._cat_encoders[col] = {cat: code for code, cat in enumerate(cat_series.cat.categories)}
+            df_te[f"{col}_code"] = cat_series.cat.codes
 
         lgb_features = [f"{c}_code" for c in CAT_FEATURES] + NUM_FEATURES + TE_FEATURES
         X_lgb = df_te[lgb_features]
@@ -556,12 +573,26 @@ class PriceModel:
             actual_price = listings[i].get("price", 0)
             pct = round((1.0 - actual_price / p50) * 100, 1) if p50 > 0 and actual_price > 0 else None
 
+            # Prediction confidence based on training sample count
+            brand = str(listings[i].get("brand", "unknown"))
+            model_name = str(listings[i].get("model", "unknown"))
+            bm_key = f"{brand}_{model_name}"
+            n_samples = self._sample_counts.get(bm_key, 0)
+            if n_samples >= 50:
+                confidence = "high"
+            elif n_samples >= 15:
+                confidence = "medium"
+            else:
+                confidence = "low"
+
             results.append(
                 {
                     "p10": p10,
                     "p50": p50,
                     "p90": p90,
                     "price_vs_market_pct": pct,
+                    "confidence": confidence,
+                    "sample_count": n_samples,
                 }
             )
 
@@ -581,7 +612,8 @@ class PriceModel:
         # LightGBM prediction
         if self._lgb_model is not None and hasattr(self, "_lgb_features"):
             for col in CAT_FEATURES:
-                df_te[f"{col}_code"] = df_te[col].astype("category").cat.codes
+                mapping = self._cat_encoders.get(col, {})
+                df_te[f"{col}_code"] = df_te[col].map(mapping).fillna(-1).astype(int)
             X_lgb = df_te[self._lgb_features]
             lgb_pred = np.exp(self._lgb_model.predict(X_lgb))
             result = result + w_lgb * lgb_pred
@@ -621,6 +653,8 @@ class PriceModel:
             "te_stats": self._te_stats,
             "global_log_mean": self._global_log_mean,
             "lgb_features": getattr(self, "_lgb_features", None),
+            "cat_encoders": self._cat_encoders,
+            "sample_counts": self._sample_counts,
             "has_text": self._has_text,
         }
         with open(METADATA_PATH, "wb") as f:
@@ -661,6 +695,8 @@ class PriceModel:
                     self._te_stats = meta.get("te_stats", {})
                     self._global_log_mean = meta.get("global_log_mean", 0.0)
                     self._lgb_features = meta.get("lgb_features")
+                    self._cat_encoders = meta.get("cat_encoders", {})
+                    self._sample_counts = meta.get("sample_counts", {})
                     self._has_text = meta.get("has_text", False)
 
             # Load LightGBM
@@ -725,23 +761,26 @@ class PriceModel:
                 df[col] = "unknown"
             df[col] = df[col].fillna("unknown").astype(str)
 
-        num_defaults = {
+        # Use NaN for missing numeric features so CatBoost/LightGBM handle them
+        # natively (as "missing") instead of confusing 0 with real values.
+        num_defaults_real = {
             "year": 2020,
-            "mileage": 0,
-            "engine_volume": 0.0,
-            "power_hp": 0,
-            "owners_count": 0,
             "photo_count": 0,
             "is_dealer": 0,
         }
-        for col, default in num_defaults.items():
+        num_defaults_nan = ["mileage", "engine_volume", "power_hp", "owners_count"]
+
+        for col, default in num_defaults_real.items():
             if col not in df.columns:
                 df[col] = default
-            df[col] = df[col].fillna(default)
-            if isinstance(default, float):
-                df[col] = df[col].astype(float)
-            else:
-                df[col] = df[col].astype(int)
+            df[col] = df[col].fillna(default).astype(int)
+
+        for col in num_defaults_nan:
+            if col not in df.columns:
+                df[col] = np.nan
+            df[col] = df[col].astype(float)
+            # Replace 0 with NaN for fields where 0 is nonsensical
+            df.loc[df[col] == 0, col] = np.nan
 
         df = self._add_derived_features(df)
         return df
@@ -754,8 +793,8 @@ class PriceModel:
 
         car_age = CURRENT_YEAR - year
         df["car_age"] = car_age
-        df["log_car_age"] = car_age.apply(lambda a: math.log(a + 1))
-        df["log_mileage"] = mileage.apply(lambda m: math.log(m + 1))
+        df["log_car_age"] = np.log(car_age.astype(float) + 1)
+        df["log_mileage"] = np.log(mileage + 1)  # NaN-safe: np.log(NaN) = NaN
         df["mileage_per_year"] = mileage / car_age.clip(lower=1)
         df["mileage_ratio"] = mileage / (car_age * 15_000 + 1)
 

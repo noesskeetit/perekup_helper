@@ -18,7 +18,6 @@ MLflow integration (v3):
 from __future__ import annotations
 
 import logging
-import math
 import shutil
 import tempfile
 from datetime import UTC, datetime, timedelta
@@ -104,7 +103,7 @@ async def train_model(*, exclude_sources: list[str] | None = None) -> dict:
                 "brand": row.brand or "unknown",
                 "model": row.model or "unknown",
                 "year": row.year or 2020,
-                "mileage": row.mileage or 0,
+                "mileage": row.mileage,
                 "price": row.price,
                 "source": row.source or "unknown",
                 "city": row.city or "unknown",
@@ -112,9 +111,9 @@ async def train_model(*, exclude_sources: list[str] | None = None) -> dict:
                 "transmission": row.transmission or "unknown",
                 "drive_type": row.drive_type or "unknown",
                 "body_type": row.body_type or "unknown",
-                "engine_volume": row.engine_volume or 0.0,
-                "power_hp": row.power_hp or 0,
-                "owners_count": row.owners_count or 0,
+                "engine_volume": row.engine_volume,
+                "power_hp": row.power_hp,
+                "owners_count": row.owners_count,
                 "photo_count": row.photo_count or 0,
                 "is_dealer": int(row.is_dealer) if row.is_dealer else 0,
                 "listing_date": row.listing_date,
@@ -179,7 +178,17 @@ async def train_model(*, exclude_sources: list[str] | None = None) -> dict:
 
     df = pd.concat(mad_clean_parts, ignore_index=True)
 
-    # 4. Cross-source price sanity filter.
+    # 4. Mileage vs age sanity filter — remove listings with impossible mileage
+    mileage_removed = 0
+    if "mileage" in df.columns and "year" in df.columns:
+        car_age = CURRENT_YEAR - df["year"]
+        # > 60K km/year is unrealistic for most passenger cars
+        mileage_per_year = df["mileage"] / car_age.clip(lower=1)
+        bad_mileage = mileage_per_year > 60_000
+        mileage_removed = int(bad_mileage.sum())
+        df = df[~bad_mileage].copy()
+
+    # 5. Cross-source price sanity filter.
     #    Auto.ru sometimes captures monthly payments or down payments as prices.
     #    Remove listings whose price is <30% of the (brand, model) median across all sources.
     cross_source_removed = 0
@@ -191,10 +200,11 @@ async def train_model(*, exclude_sources: list[str] | None = None) -> dict:
         df = df[~suspicious].copy()
 
     logger.info(
-        "Removed %d stale, %d IQR outliers, %d MAD outliers, %d cross-source suspicious from %d total (kept %d)",
+        "Removed %d stale, %d IQR outliers, %d MAD outliers, %d bad mileage, %d cross-source suspicious from %d total (kept %d)",
         stale_count,
         outlier_count,
         mad_outlier_count,
+        mileage_removed,
         cross_source_removed,
         total,
         len(df),
@@ -274,16 +284,13 @@ async def score_listings(limit: int = 500) -> int:
         # Prepare features
         feature_dicts = []
         for listing in listings:
-            year = listing.year or 2020
-            mileage = listing.mileage or 0
-            car_age = CURRENT_YEAR - year
-
+            # Pass raw values — model's _fill_defaults handles NaN properly
             feature_dicts.append(
                 {
                     "brand": listing.brand or "unknown",
                     "model": listing.model or "unknown",
-                    "year": year,
-                    "mileage": mileage,
+                    "year": listing.year or 2020,
+                    "mileage": listing.mileage,
                     "price": listing.price,
                     "source": listing.source or "unknown",
                     "city": listing.city or "unknown",
@@ -291,18 +298,13 @@ async def score_listings(limit: int = 500) -> int:
                     "transmission": listing.transmission or "unknown",
                     "drive_type": listing.drive_type or "unknown",
                     "body_type": listing.body_type or "unknown",
-                    "engine_volume": listing.engine_volume or 0.0,
-                    "power_hp": listing.power_hp or 0,
-                    "owners_count": listing.owners_count or 0,
+                    "engine_volume": listing.engine_volume,
+                    "power_hp": listing.power_hp,
+                    "owners_count": listing.owners_count,
                     "photo_count": listing.photo_count or 0,
                     "is_dealer": int(listing.is_dealer) if listing.is_dealer else 0,
                     "listing_date": listing.listing_date,
                     "created_at": listing.created_at,
-                    "car_age": car_age,
-                    "log_car_age": math.log(car_age + 1),
-                    "log_mileage": math.log(mileage + 1),
-                    "mileage_per_year": mileage / max(car_age, 1),
-                    "mileage_ratio": mileage / (car_age * 15_000 + 1),
                     "description": getattr(listing, "description", "") or "",
                 }
             )
@@ -313,19 +315,26 @@ async def score_listings(limit: int = 500) -> int:
         # Update DB
         scored = 0
         skipped_sanity = 0
+        skipped_low_conf = 0
         for listing, pred in zip(listings, predictions, strict=False):
             p50 = pred["p50"]
             pct = pred["price_vs_market_pct"]
+            confidence = pred.get("confidence", "low")
 
             if p50 and p50 > 0:
                 # Sanity check: skip wildly wrong predictions.
-                # If p50 is >3x or <0.33x the actual price, the model
-                # likely has too few examples for this brand+model.
                 actual = listing.price
                 if actual > 0:
                     ratio = p50 / actual
                     if ratio > 2.5 or ratio < 0.4:
                         skipped_sanity += 1
+                        continue
+
+                # Tighter sanity bounds for low-confidence predictions
+                if confidence == "low" and actual > 0:
+                    ratio = p50 / actual
+                    if ratio > 1.8 or ratio < 0.55:
+                        skipped_low_conf += 1
                         continue
 
                 listing.market_price = p50
@@ -336,7 +345,9 @@ async def score_listings(limit: int = 500) -> int:
                 scored += 1
 
         if skipped_sanity:
-            logger.info("Skipped %d listings with unreliable predictions (>3x deviation)", skipped_sanity)
+            logger.info("Skipped %d listings with unreliable predictions (>2.5x deviation)", skipped_sanity)
+        if skipped_low_conf:
+            logger.info("Skipped %d low-confidence predictions (tight bounds)", skipped_low_conf)
 
         try:
             await session.commit()

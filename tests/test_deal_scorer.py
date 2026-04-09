@@ -161,11 +161,16 @@ class TestAgeDampening:
 
     async def test_old_car_dampened(self):
         # year 2005, age=21 → >15 → diff * 0.5
-        # 50 + (20 * 0.5 * 1.5) + 10 (clean) = 75
-        # mileage 300K/21yr = 14.3K → neutral range
+        # 50 + (20 * 0.5 * 1.5) + 10 (clean) + 5 (low km/yr) = 80
+        listing = _make_listing(price_diff_pct=20.0, category="clean", year=2005, mileage=150_000)
+        score = await compute_deal_score(listing)
+        assert score == 80
+
+    async def test_old_car_high_mileage_capped(self):
+        # 300K+ mileage → hard cap at 30 regardless of other factors
         listing = _make_listing(price_diff_pct=20.0, category="clean", year=2005, mileage=300_000)
         score = await compute_deal_score(listing)
-        assert score == 75
+        assert score <= 30
 
     async def test_medium_old_car_dampened(self):
         # year 2014, age=12 → >10 → diff * 0.75

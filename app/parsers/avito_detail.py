@@ -161,6 +161,12 @@ def enrich_listing_from_detail(listing: ParsedListing, html: str) -> ParsedListi
     if "modification" in params and not listing.modification:
         listing.modification = params["modification"]
 
+    # Fallback: extract power_hp from modification string like "1.6 MPI AT (110 л.с.)"
+    if listing.power_hp is None and listing.modification:
+        m = re.search(r"(\d+)\s*л\.?\s*с", listing.modification)
+        if m:
+            listing.power_hp = int(m.group(1))
+
     # ── Extra attribute data → raw_data ──────────────────────────────
 
     if "damage_raw" in params:
@@ -493,7 +499,8 @@ def _extract_location(html: str) -> dict[str, str] | None:
         if m:
             location["region"] = m.group(1)
 
-    # Pattern 4: address field
+    # Pattern 4: address field — only use for city, NOT region
+    # (address often contains street names, not regions)
     if "city" not in location:
         m = re.search(r'"address"\s*:\s*"([^"]+)"', unescaped)
         if m:
@@ -501,8 +508,6 @@ def _extract_location(html: str) -> dict[str, str] | None:
             parts = [p.strip() for p in addr.split(",")]
             if parts:
                 location["city"] = parts[0]
-                if len(parts) > 1 and "region" not in location:
-                    location["region"] = parts[1]
 
     return location if location else None
 

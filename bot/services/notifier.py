@@ -45,9 +45,7 @@ def _matches(listing: Listing, f: Filter) -> bool:
         return False
     if f.min_year is not None and listing.year < f.min_year:
         return False
-    return not (
-        f.min_deal_score is not None and (listing.deal_score is None or listing.deal_score < f.min_deal_score)
-    )
+    return not (f.min_deal_score is not None and (listing.deal_score is None or listing.deal_score < f.min_deal_score))
 
 
 def _format_message(listing: Listing) -> str:

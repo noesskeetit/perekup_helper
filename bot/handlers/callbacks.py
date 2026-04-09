@@ -1,12 +1,37 @@
 """Callback handlers for inline keyboard buttons in notifications."""
 
 from aiogram import Router
-from aiogram.types import CallbackQuery
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from sqlalchemy import delete, select
 
 from bot.db.models import MutedBrand
 from bot.db.session import async_session
 
 router = Router()
+
+
+@router.message(Command("muted"))
+async def cmd_muted(message: Message) -> None:
+    """Show and manage muted brands."""
+    uid = message.from_user.id
+    async with async_session() as session:
+        result = await session.execute(select(MutedBrand).where(MutedBrand.telegram_id == uid))
+        muted = result.scalars().all()
+
+    if not muted:
+        await message.answer("У тебя нет скрытых брендов.")
+        return
+
+    lines = ["🔇 <b>Скрытые бренды:</b>\n"]
+    buttons = []
+    for m in muted:
+        lines.append(f"  • {m.brand}")
+        buttons.append([InlineKeyboardButton(text=f"✅ Вернуть {m.brand}", callback_data=f"unmute:{m.brand}")])
+
+    buttons.append([InlineKeyboardButton(text="🗑 Очистить все", callback_data="unmute_all")])
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
 
 
 @router.callback_query(lambda c: c.data and c.data.startswith("mute:"))
@@ -69,3 +94,32 @@ async def callback_more_like_this(callback: CallbackQuery) -> None:
 
     await callback.message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
     await callback.answer()
+
+
+@router.callback_query(lambda c: c.data and c.data.startswith("unmute:"))
+async def callback_unmute_brand(callback: CallbackQuery) -> None:
+    """Unmute a brand — restore notifications for it."""
+    brand = callback.data.split(":", 1)[1]
+    telegram_id = callback.from_user.id
+
+    async with async_session() as session:
+        await session.execute(
+            delete(MutedBrand).where(MutedBrand.telegram_id == telegram_id, MutedBrand.brand == brand.lower())
+        )
+        await session.commit()
+
+    await callback.answer(f"{brand} возвращён в уведомления")
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+
+@router.callback_query(lambda c: c.data == "unmute_all")
+async def callback_unmute_all(callback: CallbackQuery) -> None:
+    """Unmute all brands."""
+    telegram_id = callback.from_user.id
+
+    async with async_session() as session:
+        await session.execute(delete(MutedBrand).where(MutedBrand.telegram_id == telegram_id))
+        await session.commit()
+
+    await callback.answer("Все бренды возвращены")
+    await callback.message.edit_text("🔇 Список скрытых брендов очищен.")

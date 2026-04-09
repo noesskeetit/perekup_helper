@@ -79,24 +79,36 @@ async def cmd_deals(message: Message) -> None:
         await message.answer("Сейчас нет горячих предложений.")
         return
 
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
     lines = ["🔥 <b>Топ-5 горячих предложений:</b>\n"]
+    buttons = []
     for i, deal in enumerate(deals[:5], 1):
         brand = deal.get("brand", "?")
-        model = deal.get("model", "?")
+        model_name = deal.get("model", "?")
         year = deal.get("year", "?")
         price = deal.get("price", 0)
-        diff = deal.get("diff_pct", deal.get("price_diff_pct", 0))
         score = deal.get("deal_score", 0)
         market = deal.get("market_price")
+        mileage = deal.get("mileage")
+        city = deal.get("city", "")
         url = deal.get("url", "")
-        lines.append(f"{i}. <b>{brand} {model}</b> {year}  ⭐{score}")
-        market_str = f"  (рынок ~{market:,.0f}₽)" if market else ""
+
+        market_str = f"  →  рынок {market:,.0f}₽" if market else ""
+        km_str = f" · {mileage:,}км" if mileage else ""
+        city_str = f" · {city}" if city else ""
+
+        lines.append(f"{i}. <b>{brand} {model_name}</b> {year}  ⭐{score:.0f}")
         lines.append(f"   💰 {price:,.0f}₽{market_str}")
-        if url:
-            lines.append(f"   🔗 {url}")
+        if km_str or city_str:
+            lines.append(f"   📍{km_str}{city_str}")
         lines.append("")
 
-    await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
+        if url:
+            buttons.append([InlineKeyboardButton(text=f"{i}. {brand} {model_name} {year}", url=url)])
+
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+    await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
 
 
 @router.message(Command("drops"))
@@ -170,23 +182,33 @@ async def cmd_search(message: Message) -> None:
         await message.answer(f"Ничего не найдено по запросу: {query}")
         return
 
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
     query = f"{brand} {model_name}" if model_name else brand
     lines = [f"🔍 <b>Результаты: {query}</b> ({len(results)} шт)\n"]
+    buttons = []
     for i, r in enumerate(results[:5], 1):
         diff = r.get("diff_pct")
         diff_str = f"  📉 {diff:+.0f}%" if diff else ""
         score = r.get("deal_score")
         score_str = f"  ⭐{score:.0f}" if score else ""
         mil = r.get("mileage")
-        mil_str = f"  🛣{mil:,}км" if mil else ""
+        mil_str = f" · {mil:,}км" if mil else ""
+        city = r.get("city", "")
+        city_str = f" · {city}" if city else ""
+
         lines.append(f"{i}. <b>{r['brand']} {r['model']}</b> {r['year']}")
-        lines.append(f"   💰 {r['price']:,.0f}₽{diff_str}{score_str}{mil_str}")
-        url = r.get("url", "")
-        if url:
-            lines.append(f"   🔗 {url}")
+        lines.append(f"   💰 {r['price']:,.0f}₽{diff_str}{score_str}")
+        if mil_str or city_str:
+            lines.append(f"   📍{mil_str}{city_str}")
         lines.append("")
 
-    await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
+        url = r.get("url", "")
+        if url:
+            buttons.append([InlineKeyboardButton(text=f"{i}. {r['brand']} {r['model']} {r['year']}", url=url)])
+
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+    await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
 
 
 @router.message(Command("calc"))

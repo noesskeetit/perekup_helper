@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -10,6 +11,8 @@ from app.models.base import Base
 from app.routes.listings import router as listings_router
 from app.routes.stats import router as stats_router
 from app.scheduler import start_scheduler, stop_scheduler
+
+logger = logging.getLogger(__name__)
 
 
 def _price_drop_info(listing) -> tuple[bool, float]:
@@ -112,28 +115,34 @@ async def run_pipeline_now():
 @app.post("/api/retrain-model")
 async def retrain_model_now():
     """Manually retrain the CatBoost price model."""
-    from app.services.pricing_trainer import score_listings, train_model
+    try:
+        from app.services.pricing_trainer import score_listings, train_model
 
-    # Exclude Auto.ru from training due to price data quality issues
-    stats = await train_model(exclude_sources=["autoru"])
-    scored = 0
-    if stats.get("status") == "trained":
-        scored = await score_listings(limit=5000)
+        stats = await train_model(exclude_sources=["autoru"])
+        scored = 0
+        if stats.get("status") == "trained":
+            scored = await score_listings(limit=5000)
 
-    # Also run deal scoring
-    from app.services.deal_scorer import score_deals
+        from app.services.deal_scorer import score_deals
 
-    deal_scored = await score_deals(limit=5000)
+        deal_scored = await score_deals(limit=5000)
 
-    return {"training": stats, "price_scored": scored, "deal_scored": deal_scored}
+        return {"training": stats, "price_scored": scored, "deal_scored": deal_scored}
+    except Exception as e:
+        logger.exception("Retrain failed")
+        return {"error": str(e), "training": {"status": "failed"}}
 
 
 @app.post("/api/run-analysis")
 async def run_analysis_now(max_total: int = 2000):
     """Run auto-scaling AI analysis pool on backlog."""
-    from app.services.analysis_pool import run_analysis_pool
+    try:
+        from app.services.analysis_pool import run_analysis_pool
 
-    return await run_analysis_pool(max_total=max_total)
+        return await run_analysis_pool(max_total=max_total)
+    except Exception as e:
+        logger.exception("Analysis failed")
+        return {"error": str(e), "status": "failed"}
 
 
 @app.get("/api/hot-deals")

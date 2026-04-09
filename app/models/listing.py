@@ -34,9 +34,7 @@ class AnalysisCategory(str, enum.Enum):
 
 class Listing(Base):
     __tablename__ = "listings"
-    __table_args__ = (
-        UniqueConstraint("source", "external_id", name="uq_source_external_id"),
-    )
+    __table_args__ = (UniqueConstraint("source", "external_id", name="uq_source_external_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)

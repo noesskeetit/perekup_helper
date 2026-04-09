@@ -142,12 +142,17 @@
                 <strong>{{ listing.brand }}</strong> {{ listing.model }}
             </div>
             <div class="card-year-mileage">
-                {{ listing.year }}{% if listing.mileage %} &middot; {{ "{:,.0f}".format(listing.mileage).replace(",", " ") }} км{% endif %}
+                {{ listing.year }}{% if listing.mileage %} &middot; {{ "{:,.0f}".format(listing.mileage).replace(",", " ") }} км{% endif %}{% if listing.city %} &middot; {{ listing.city }}{% endif %}
             </div>
             <div class="card-price">{{ "{:,.0f}".format(listing.price).replace(",", " ") }} &#8381;</div>
             <div class="card-market-price">
                 {% if listing.market_price %}
                 Рынок: {{ "{:,.0f}".format(listing.market_price).replace(",", " ") }} &#8381;
+                {% endif %}
+                {% if listing.deal_score %}
+                <span class="score-badge {% if listing.deal_score >= 80 %}score-hot{% elif listing.deal_score >= 60 %}score-good{% elif listing.deal_score >= 40 %}score-mid{% else %}score-low{% endif %}">
+                    &#9733; {{ "%.0f" | format(listing.deal_score) }}
+                </span>
                 {% endif %}
             </div>
             <div class="card-badges">

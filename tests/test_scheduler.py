@@ -94,9 +94,10 @@ class TestStartStopScheduler:
 
         start_scheduler()
 
-        # First add_job call is the parse job with interval minutes
+        # First add_job call is the parse job with interval in seconds
         first_call = mock_instance.add_job.call_args_list[0]
-        assert first_call.kwargs.get("minutes") == settings.parse_interval_minutes
+        expected = settings.parse_interval_seconds or settings.parse_interval_minutes * 60
+        assert first_call.kwargs.get("seconds") == expected
 
 
 class TestParseJob:

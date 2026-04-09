@@ -204,7 +204,9 @@ class AvitoParser(BaseParser):
                     params = {f"id{i}": eid for i, eid in enumerate(external_ids)}
                     result = conn.execute(
                         text(
-                            f"SELECT external_id FROM listings WHERE source = 'avito' AND external_id IN ({placeholders})"
+                            f"SELECT external_id FROM listings WHERE source = 'avito'"
+                            f" AND body_type IS NOT NULL"
+                            f" AND external_id IN ({placeholders})"
                         ),
                         params,
                     )

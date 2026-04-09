@@ -64,11 +64,13 @@ def start_scheduler() -> AsyncIOScheduler:
 
     _scheduler = AsyncIOScheduler()
 
-    # Parse every N minutes
+    # Parse interval: prefer seconds, fallback to minutes
+    interval_seconds = settings.parse_interval_seconds or settings.parse_interval_minutes * 60
+
     _scheduler.add_job(
         _parse_job,
         "interval",
-        minutes=settings.parse_interval_minutes,
+        seconds=interval_seconds,
         id="parse_all_sources",
         name="Parse all sources",
         max_instances=1,
@@ -86,7 +88,12 @@ def start_scheduler() -> AsyncIOScheduler:
     )
 
     _scheduler.start()
-    logger.info("Scheduler started: parse every %d min, model retrain daily at 04:00", settings.parse_interval_minutes)
+    logger.info(
+        "Scheduler started: parse every %ds (%dh%dm), model retrain daily at 04:00",
+        interval_seconds,
+        interval_seconds // 3600,
+        (interval_seconds % 3600) // 60,
+    )
     return _scheduler
 
 

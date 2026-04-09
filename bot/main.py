@@ -10,7 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 
 from bot.config import settings
 from bot.db.session import init_db
-from bot.handlers import filters, start, stats
+from bot.handlers import callbacks, filters, start, stats
 from bot.services.notifier import run_notifier
 
 logging.basicConfig(
@@ -32,6 +32,7 @@ async def main() -> None:
     dp.include_router(start.router)
     dp.include_router(filters.router)
     dp.include_router(stats.router)
+    dp.include_router(callbacks.router)
 
     notifier_task = asyncio.create_task(run_notifier(bot))
 

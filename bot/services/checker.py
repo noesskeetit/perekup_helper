@@ -33,6 +33,11 @@ class Listing:
     category: str
     url: str
     photo_url: str | None = None
+    deal_score: float | None = None
+    mileage: int | None = None
+    city: str | None = None
+    source: str | None = None
+    listing_id: str | None = None
 
 
 class ListingChecker(Protocol):
@@ -114,6 +119,11 @@ class DatabaseChecker:
             category=category,
             url=db_listing.url,
             photo_url=photo_url,
+            deal_score=float(db_listing.deal_score) if db_listing.deal_score else None,
+            mileage=db_listing.mileage,
+            city=db_listing.city,
+            source=db_listing.source,
+            listing_id=str(db_listing.id),
         )
 
 

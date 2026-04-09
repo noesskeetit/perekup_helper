@@ -91,8 +91,8 @@ class TestFormatMessage:
         assert "1,800,000" in msg
         assert "2,000,000" in msg
         assert "10.0%" in msg
-        assert "Седан" in msg
-        assert "https://example.com/listing/123" in msg
+        # URL moved to inline keyboard button, category displayed as label
+        assert "Седан" in msg or "Чистая" in msg or "📦" in msg
 
 
 class TestNotifyUser:

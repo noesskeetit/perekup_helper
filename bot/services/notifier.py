@@ -4,14 +4,32 @@ import asyncio
 import logging
 
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy import select
 
 from bot.config import settings
-from bot.db.models import Filter, NotificationLog, User
+from bot.db.models import Filter, MutedBrand, NotificationLog, User
 from bot.db.session import async_session
 from bot.services.checker import DatabaseChecker, DemoChecker, Listing, ListingChecker
 
 logger = logging.getLogger(__name__)
+
+# Category display names
+_CATEGORY_LABELS = {
+    "clean": "Чистая",
+    "damaged_body": "Битый кузов",
+    "bad_docs": "Проблемы с ПТС",
+    "debtor": "Залог/долги",
+    "complex_but_profitable": "Сложная, но выгодная",
+}
+
+_CATEGORY_ICONS = {
+    "clean": "✅",
+    "damaged_body": "🔴",
+    "bad_docs": "⚠️",
+    "debtor": "🚫",
+    "complex_but_profitable": "🟡",
+}
 
 
 def _matches(listing: Listing, f: Filter) -> bool:
@@ -25,14 +43,54 @@ def _matches(listing: Listing, f: Filter) -> bool:
 
 
 def _format_message(listing: Listing) -> str:
-    return (
-        f"🚗 {listing.brand} {listing.model} {listing.year}\n"
-        f"💰 Цена: {listing.price:,.0f} ₽\n"
-        f"📈 Рыночная: {listing.market_price:,.0f} ₽\n"
-        f"🔥 Дисконт: {listing.discount_pct}%\n"
-        f"📦 Категория: {listing.category}\n"
-        f"🔗 {listing.url}"
+    lines = [f"🚗 {listing.brand} {listing.model} {listing.year}"]
+
+    # Price block
+    lines.append(f"💰 {listing.price:,.0f} ₽  →  рынок {listing.market_price:,.0f} ₽")
+    lines.append(f"🔥 Ниже рынка на {listing.discount_pct}%")
+
+    # Deal score
+    if listing.deal_score is not None:
+        score = int(listing.deal_score)
+        if score >= 80:
+            lines.append(f"⭐ Оценка сделки: {score}/100")
+        elif score >= 60:
+            lines.append(f"👍 Оценка сделки: {score}/100")
+        else:
+            lines.append(f"📊 Оценка сделки: {score}/100")
+
+    # Details line
+    details = []
+    if listing.mileage:
+        km = listing.mileage
+        details.append(f"{km:,} км" if km < 1_000_000 else f"{km // 1000}K км")
+    if listing.city:
+        details.append(listing.city)
+    if listing.source:
+        details.append(listing.source.capitalize())
+    if details:
+        lines.append(f"📍 {' · '.join(details)}")
+
+    # AI verdict
+    if listing.category:
+        icon = _CATEGORY_ICONS.get(listing.category, "📦")
+        label = _CATEGORY_LABELS.get(listing.category, listing.category)
+        lines.append(f"{icon} {label}")
+
+    return "\n".join(lines)
+
+
+def _make_keyboard(listing: Listing) -> InlineKeyboardMarkup:
+    buttons = []
+    if listing.url:
+        buttons.append([InlineKeyboardButton(text="🔗 Открыть объявление", url=listing.url)])
+    buttons.append(
+        [
+            InlineKeyboardButton(text="❌ Скрыть бренд", callback_data=f"mute:{listing.brand}"),
+            InlineKeyboardButton(text="👁 Ещё такие", callback_data=f"more:{listing.brand}:{listing.model}"),
+        ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 async def _notify_user(
@@ -41,15 +99,17 @@ async def _notify_user(
     listing: Listing,
 ) -> None:
     text = _format_message(listing)
+    keyboard = _make_keyboard(listing)
     try:
         if listing.photo_url:
             await bot.send_photo(
                 chat_id=telegram_id,
                 photo=listing.photo_url,
                 caption=text,
+                reply_markup=keyboard,
             )
         else:
-            await bot.send_message(chat_id=telegram_id, text=text)
+            await bot.send_message(chat_id=telegram_id, text=text, reply_markup=keyboard)
     except Exception:
         logger.exception("Failed to send notification to %s", telegram_id)
         return
@@ -88,8 +148,16 @@ async def run_notifier(bot: Bot, checker: ListingChecker | None = None) -> None:
                     )
                     sent_urls: set[str] = {row[0] for row in sent_result}
 
+                    # Pre-fetch muted brands for this user
+                    muted_result = await session.execute(
+                        select(MutedBrand.brand).where(MutedBrand.telegram_id == user.telegram_id)
+                    )
+                    muted_brands: set[str] = {row[0] for row in muted_result}
+
                     for listing in listings:
                         if listing.url in sent_urls:
+                            continue
+                        if listing.brand.lower() in muted_brands:
                             continue
                         for f in user_filters:
                             if _matches(listing, f):

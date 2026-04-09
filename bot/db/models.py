@@ -35,3 +35,11 @@ class NotificationLog(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
     listing_url: Mapped[str] = mapped_column(String)
     sent_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class MutedBrand(Base):
+    __tablename__ = "muted_brands"
+
+    telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    brand: Mapped[str] = mapped_column(String, primary_key=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())

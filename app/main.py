@@ -151,16 +151,21 @@ async def hot_deals(
     category: str | None = "clean",
     limit: int = 50,
     city: str | None = None,
+    max_age_hours: int = 48,
 ):
     """Get hot deals — listings significantly below market price.
 
-    Ready-made JSON for Telegram bot or external consumers.
+    Only shows listings created within max_age_hours (default 48h).
     """
+    from datetime import UTC, datetime, timedelta
+
     from sqlalchemy import desc, select
     from sqlalchemy.orm import selectinload
 
     from app.db.session import async_session_factory
     from app.models.listing import Listing, ListingAnalysis
+
+    cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
 
     async with async_session_factory() as session:
         stmt = (
@@ -170,6 +175,7 @@ async def hot_deals(
                 Listing.is_duplicate.is_(False),
                 Listing.price_diff_pct >= min_diff,
                 Listing.market_price.isnot(None),
+                Listing.created_at >= cutoff,
             )
         )
         if category:
@@ -339,17 +345,20 @@ async def price_drops(
 
 
 @app.get("/api/top-deals")
-async def top_deals(limit: int = 20, min_score: int = 70):
+async def top_deals(limit: int = 20, min_score: int = 70, max_age_hours: int = 48):
     """Top deals ranked by deal_score (0-100).
 
-    Uses the pre-computed deal_score which factors in:
-    price vs market, AI category, mileage, photos, freshness, owners, data completeness.
+    Only shows listings created within max_age_hours (default 48h).
     """
+    from datetime import UTC, datetime, timedelta
+
     from sqlalchemy import desc, select
     from sqlalchemy.orm import selectinload
 
     from app.db.session import async_session_factory
     from app.models.listing import Listing
+
+    cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
 
     async with async_session_factory() as session:
         stmt = (
@@ -359,7 +368,8 @@ async def top_deals(limit: int = 20, min_score: int = 70):
                 Listing.is_duplicate.is_(False),
                 Listing.deal_score.isnot(None),
                 Listing.deal_score >= min_score,
-                Listing.price > 100_000,  # filter garbage prices
+                Listing.price > 100_000,
+                Listing.created_at >= cutoff,
             )
             .order_by(desc(Listing.deal_score), desc(Listing.price_diff_pct))
             .limit(limit)

@@ -75,6 +75,11 @@ class DatabaseChecker:
 
             if self._last_check is not None:
                 stmt = stmt.where(AppListing.created_at > self._last_check)
+            else:
+                # First run: only show listings from last 48h, not entire DB
+                from datetime import timedelta
+
+                stmt = stmt.where(AppListing.created_at > datetime.now(UTC) - timedelta(hours=48))
 
             if brand is not None:
                 stmt = stmt.where(func.lower(AppListing.brand) == brand.lower())

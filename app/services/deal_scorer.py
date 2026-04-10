@@ -144,8 +144,10 @@ async def compute_deal_score(listing: Listing) -> int:
         if listing.mileage / car_age > 50_000:
             score = min(score, 40)
 
-    # Keyword red flags from description
+    # Keyword red flags from description AND URL
     desc = (listing.description or "").lower()
+    url_lower = (getattr(listing, "url", None) or "").lower()
+    text_to_check = f"{desc} {url_lower}"
     red_flags = [
         "на запчасти",
         "под разбор",
@@ -156,8 +158,14 @@ async def compute_deal_score(listing: Listing) -> int:
         "утеряны документы",
         "без птс",
         "конструктор",
+        "битый",
+        "битая",
+        "бит.",
+        "после дтп",
+        "требует ремонт",
+        "требует вложен",
     ]
-    if any(flag in desc for flag in red_flags):
+    if any(flag in text_to_check for flag in red_flags):
         score = min(score, 15)
 
     # Clamp to 0-100

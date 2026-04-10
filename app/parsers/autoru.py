@@ -398,16 +398,17 @@ class AutoruParser(BaseParser):
         """
         SEARCH_RADIUS = 15_000
 
-        # Step 1: Collect unique offer URLs and IDs
+        # Step 1: Collect unique offer URLs and IDs (keyed by full_id)
         url_pattern = re.compile(r"auto\.ru/cars/used/sale/(\w+)/(\w+)/(\d+)-([a-f0-9]+)/")
         offer_urls: dict[str, dict] = {}
 
         for m in url_pattern.finditer(html):
-            numeric_id = m.group(3)  # e.g. "1132037070"
+            numeric_id = m.group(3)
             full_id = f"{numeric_id}-{m.group(4)}"
-            if numeric_id not in offer_urls:
-                offer_urls[numeric_id] = {
+            if full_id not in offer_urls:
+                offer_urls[full_id] = {
                     "full_id": full_id,
+                    "numeric_id": numeric_id,
                     "brand_slug": m.group(1),
                     "model_slug": m.group(2),
                     "url": f"https://auto.ru/cars/used/sale/{m.group(1)}/{m.group(2)}/{full_id}/",
@@ -416,10 +417,16 @@ class AutoruParser(BaseParser):
         if not offer_urls:
             return []
 
-        # Step 2: Find data blocks by numeric ID proximity
-        # Data is near patterns like "id":"1132037070" in the data section
+        # Step 2: Find data blocks by full_id or numeric_id proximity
         listings = []
-        for numeric_id, url_info in offer_urls.items():
+        seen_ids: set[str] = set()
+        for url_info in offer_urls.values():
+            full_id = url_info["full_id"]
+            numeric_id = url_info["numeric_id"]
+            if numeric_id in seen_ids:
+                continue
+            seen_ids.add(numeric_id)
+
             id_pattern = re.compile(rf'"{numeric_id}"')
             for id_match in id_pattern.finditer(html):
                 start = max(0, id_match.start() - SEARCH_RADIUS)
@@ -441,6 +448,12 @@ class AutoruParser(BaseParser):
 
                 brand = mark_m.group(1) if mark_m else url_info["brand_slug"].replace("_", " ").title()
                 model_name = model_m.group(1) if model_m else url_info["model_slug"].replace("_", " ").title()
+
+                # Validate: if extracted brand doesn't match URL slug, skip this data block
+                # (we caught data from an adjacent listing in the 15KB radius)
+                if mark_m and url_info["brand_slug"].lower() not in brand.lower().replace("-", "").replace(" ", ""):
+                    if brand.lower().replace(" ", "") not in url_info["brand_slug"].lower():
+                        continue
 
                 # ── Engine type & transmission ──────────────────────────────
                 engine_type_m = self._RE_ENGINE_TYPE.search(chunk)

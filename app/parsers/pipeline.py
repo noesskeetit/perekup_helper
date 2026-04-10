@@ -38,12 +38,13 @@ def get_all_parsers() -> list[BaseParser]:
     except ImportError:
         pass
 
-    try:
-        from app.parsers.autoru import AutoruParser
-
-        parsers.append(AutoruParser())
-    except ImportError:
-        pass
+    # Auto.ru parser disabled — regex approach produces 82% URL/data mismatches.
+    # Needs full rewrite before re-enabling.
+    # try:
+    #     from app.parsers.autoru import AutoruParser
+    #     parsers.append(AutoruParser())
+    # except ImportError:
+    #     pass
 
     return parsers
 

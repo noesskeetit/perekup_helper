@@ -449,11 +449,8 @@ class AutoruParser(BaseParser):
                 brand = mark_m.group(1) if mark_m else url_info["brand_slug"].replace("_", " ").title()
                 model_name = model_m.group(1) if model_m else url_info["model_slug"].replace("_", " ").title()
 
-                # Validate: if extracted brand doesn't match URL slug, skip this data block
-                # (we caught data from an adjacent listing in the 15KB radius)
-                if mark_m and url_info["brand_slug"].lower() not in brand.lower().replace("-", "").replace(" ", ""):
-                    if brand.lower().replace(" ", "") not in url_info["brand_slug"].lower():
-                        continue
+                # If brand from data doesn't match URL, use the data's brand
+                # (data block is more reliable than URL slug mapping)
 
                 # ── Engine type & transmission ──────────────────────────────
                 engine_type_m = self._RE_ENGINE_TYPE.search(chunk)

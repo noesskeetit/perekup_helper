@@ -98,18 +98,7 @@ async def run_pipeline(parsers: list[BaseParser] | None = None) -> PipelineResul
             result.source_results.append(pr)
             result.total_new += pr.new_saved
 
-    # Step 2.5: Mark stale listings (not seen for 7+ days)
-    try:
-        from app.services.stale_detection import mark_stale_listings
-
-        stale_count = await mark_stale_listings(stale_days=7)
-        if stale_count:
-            logger.info("Pipeline: marked %d stale listings", stale_count)
-    except Exception as exc:
-        logger.exception("Pipeline: stale detection failed")
-        result.errors.append(f"stale_detection: {exc}")
-
-    # Step 2.6: Deduplicate across sources
+    # Step 2.5: Deduplicate across sources
     if result.total_new > 0:
         try:
             from app.db.session import async_session_factory

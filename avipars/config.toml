@@ -61,7 +61,7 @@ urls = [
     "https://www.avito.ru/volgograd/avtomobili/toyota?cd=1&s=104",
     "https://www.avito.ru/chelyabinsk/avtomobili/toyota?cd=1&s=104",
 ]
-count = 3
+count = 2
 keys_word_white_list = []
 keys_word_black_list = [
     "без ПТС",

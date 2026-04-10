@@ -108,10 +108,10 @@ def _is_cross_source_match(a: Listing, b: Listing) -> bool:
     if a.price != b.price:
         return False
 
-    # Mileage within tolerance
+    # Mileage must match exactly
     a_mil = a.mileage or 0
     b_mil = b.mileage or 0
-    return abs(a_mil - b_mil) <= _MILEAGE_TOLERANCE_KM
+    return a_mil == b_mil
 
 
 def get_duplicate_ids_for(listing: Listing, all_listings: list[Listing]) -> list[uuid.UUID]:

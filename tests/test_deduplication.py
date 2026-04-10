@@ -102,15 +102,15 @@ def test_no_match_different_price():
     assert not _is_cross_source_match(a, b)
 
 
-def test_match_mileage_within_tolerance():
+def test_match_mileage_exact():
     a = _listing(source="avito", mileage=30_000)
-    b = _listing(source="drom", mileage=30_499)
+    b = _listing(source="drom", mileage=30_000)
     assert _is_cross_source_match(a, b)
 
 
-def test_no_match_mileage_over_tolerance():
+def test_no_match_mileage_different():
     a = _listing(source="avito", mileage=30_000)
-    b = _listing(source="drom", mileage=30_501)
+    b = _listing(source="drom", mileage=30_001)
     assert not _is_cross_source_match(a, b)
 
 

@@ -148,6 +148,8 @@ async def compute_deal_score(listing: Listing) -> int:
     desc = (listing.description or "").lower()
     url_lower = (getattr(listing, "url", None) or "").lower()
     text_to_check = f"{desc} {url_lower}"
+
+    # Simple contains flags (safe — no common negation forms)
     red_flags = [
         "на запчасти",
         "под разбор",
@@ -158,14 +160,25 @@ async def compute_deal_score(listing: Listing) -> int:
         "утеряны документы",
         "без птс",
         "конструктор",
-        "битый",
-        "битая",
-        "бит.",
         "после дтп",
         "требует ремонт",
         "требует вложен",
+        "bityy",  # Avito URL marker
     ]
-    if any(flag in text_to_check for flag in red_flags):
+    has_red_flag = any(flag in text_to_check for flag in red_flags)
+
+    # "битый/битая" needs negation check — "не битый" means NOT damaged
+    if not has_red_flag:
+        for word in ("битый", "битая", "бит."):
+            if word in text_to_check:
+                # Check if preceded by "не " within 3 chars
+                idx = text_to_check.find(word)
+                prefix = text_to_check[max(0, idx - 4) : idx]
+                if "не " not in prefix and "не-" not in prefix:
+                    has_red_flag = True
+                    break
+
+    if has_red_flag:
         score = min(score, 15)
 
     # Clamp to 0-100
